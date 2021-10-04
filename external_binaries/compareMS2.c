@@ -1,8 +1,8 @@
-/*                                                                                                                   */                     
-/* compareMS2 - comparison of tandem mass spectra from LC-MS/MS data (NIFES MGF-only version for easy compilation)   */
 /*                                                                                                                   */
-/* Copyright (c) Magnus Palmblad 2010-2020                                                                           */ 
-/*                                                                                                                   */ 
+/* compareMS2 - comparison of tandem mass spectra datasets, e.g. from LC-MS/MS                                       */
+/*                                                                                                                   */
+/* Copyright (c) Magnus Palmblad 2010-2021                                                                           */
+/*                                                                                                                   */
 /* This program is free software; you can redistribute it and/or modify it under the terms of the                    */
 /* Creative Commons Attribution-Share Alike 3.0 License (http://creativecommons.org/licenses/by-sa/3.0/)             */
 /*                                                                                                                   */
@@ -11,270 +11,654 @@
 /*                                                                                                                   */
 /* Contact information: n.m.palmblad@lumc.nl                                                                         */
 /*                                                                                                                   */
-/* compile with gcc -o compareMS2 compareMS2.c                                                                       */
-/* or x86_64-w64-mingw32-gcc.exe compareMS2.c -o compareMS2                                                          */
+/* compile with gcc -o compareMS2 compareMS2.c or x86_64-w64-mingw32-gcc.exe compareMS2.c -o compareMS2              */
 /*                                                                                                                   */
-							 
+
 #include <stdio.h>
-#include <stdlib.h>  
+#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 #include <math.h>
 
-#define MIN_PEAKS 20 /* minimum number of peaks for spectrum to be compared - filters out some noise spectra */
-#define MAX_PEAKS 5000
-#define NOISE 10 /* subtract all peaks below this level */
-#define MIN_MZ 109 /* binned spectra start here */
-#define MAX_MZ 2000 /* binned spectra end here */
-#define BIN_SIZE 0.2 /* bin size in Th */
-#define N_BINS 9455 /* number of bins */
+#define MAX_LEN 8192
+#define HISTOGRAM_BINS 200
+#define	DEFAULT_MIN_BASEPEAK_INTENSITY 10000
+#define	DEFAULT_MAX_SCAN_NUMBER_DIFFERENCE  1500
+#define	DEFAULT_MAX_PRECURSOR_DIFFERENCE  2.05
+#define	DEFAULT_START_SCAN  1
+#define	DEFAULT_END_SCAN  1000000
+#define	DEFAULT_CUTOFF  0.8
+#define	DEFAULT_SCALING 0.5
+#define	DEFAULT_NOISE 10
+#define	DEFAULT_METRIC 2
+#define	DEFAULT_QC 0
+#define	DEFAULT_BIN_SIZE 0.2
+#define	DEFAULT_MIN_PEAKS 20
+#define	DEFAULT_MAX_PEAKS 5000
+#define	DEFAULT_MIN_MZ 109
+#define	DEFAULT_MAX_MZ 2000
+#define	DEFAULT_N_BINS 9455
+#define	DEFAULT_TOP_N -1
 
 /* atol0 acts the same as atol, but handles a null pointer without crashing */
 static int atol0(const char *p) {
-  if (p==0) {
-    return 0;
-  }
-  return atol(p);
+	if (p == 0) {
+		return 0;
+	}
+	return atol(p);
 }
 
-/* main starts here */
-
-int main(int argc, char *argv[]) 
-{
-  FILE *dataset_1, *dataset_2, *output;
-  char dataset_1_filename[8192], dataset_2_filename[8192], output_filename[8192], temp[8192], line[8192], *p;
-  long i, j, k, l, m, size_D1, size_D2, start_scan, end_scan, n_comparisons;
-  double min_basepeak_intensity, min_total_intensity, max_scan_number_difference, max_precursor_difference, cutoff;
-  double dot_prod, max_dot_prod, sum_dot_prod, ssum, rssum, intensity_below_500, intensity_above_500, sum;
-  long histogram[200], gt_cutoff;
-    
-  typedef struct {
-    long scan;                   /* scan number */
-    double *mz;                  /* measured m/z */
-    double *intensity;           /* measured intensities */
-    char charge;                 /* deconvoluted charge (e.g. in MGF file) */
-    double bin[N_BINS];          /* binned spectra */
-    double precursorMz;          /* precursor m/z */
-    int n_peaks;                 /* number of peaks in spectrum */
-    double basePeakIntensity;    /* basepeak intensity */
-    double totIonCurrent;        /* total ion current for spectrum */
-  } dataset_type;
-
-  dataset_type *D1, *D2;
-
-  
-  /* parsing command line parameters */
-  
-  if( (argc==2) && ( (strcmp(argv[1],"--help")==0) || (strcmp(argv[1],"-help")==0) || (strcmp(argv[1],"-h")==0)) ) /* want help? */
-    {
-      printf("compareMS2 - (c) Magnus Palmblad 2010-\n\ncompareMS2 is developed to compare, globally, all MS/MS spectra between two datasets in MGF acquired under similar conditions, or aligned so that they are comparable. This may be useful for molecular phylogenetics based on shared peptide sequences quantified by the share of highly similar tandem mass spectra. The similarity between a pair of tandem mass spectra is calculated essentially as in SpectraST [see Lam et al. Proteomics 2007, 7, 655-667 (2007)].\n\nusage: compareMS2 -1 <first dataset filename> -2 <second dataset filename> [-R <first scan number>,<last scan number> -c <score cutoff, default=0.8> -o <output filename> -m<minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error in MS/MS>]\n");
-      return 0;
-    }
-  
-  
-  /* test for correct number of parameters */
-  
-  if (argc<3 || argc>17) 
-    {
-      printf("usage: compareMS2 -1 <first dataset filename> -2 <second dataset filename> -R <first scan number>,<last scan number> [-c <score cutoff> -o <output filename> -m <minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error>] (type compareMS2 --help for more information)\n");
-      return -1;
-    }
-  
-  
-  /* assign default values */
-  
-  strcpy(output_filename,"output.txt"); min_basepeak_intensity=10000; max_scan_number_difference=1500; max_precursor_difference=2.05;
-  start_scan=1; end_scan=1000000; cutoff=0.8;
-  printf("spectrum bin size %1.3f Th -> %i bins in [%i,%i]\n",BIN_SIZE,N_BINS,MIN_MZ,MAX_MZ); fflush(stdout);
-  
-  
-  /* read and replace parameter values */
-  
-  for(i=1;i<argc;i++) {
-    if( (argv[i][0]=='-') && (argv[i][1]=='1') ) strcpy(dataset_1_filename,&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]);
-    if( (argv[i][0]=='-') && (argv[i][1]=='2') ) strcpy(dataset_2_filename,&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]);
-    if( (argv[i][0]=='-') && (argv[i][1]=='R') ) 
-      {
-	strcpy(temp,&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]); p=strtok(temp,","); 
-	start_scan=atol0(p); p=strtok('\0',","); end_scan=atol0(p);
-      }
-    if( (argv[i][0]=='-') && (argv[i][1]=='o') ) strcpy(output_filename,&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]);
-    if( (argv[i][0]=='-') && (argv[i][1]=='p') ) max_precursor_difference=atof(&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]);
-    if( (argv[i][0]=='-') && (argv[i][1]=='m') ) {
-	strcpy(temp,&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]); p=strtok(temp,","); 
-	min_basepeak_intensity=atof(p); p=strtok('\0',","); min_total_intensity=atof(p);
-      }
-    if( (argv[i][0]=='-') && (argv[i][1]=='w') ) max_scan_number_difference=atof(&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]);
-    if( (argv[i][0]=='-') && (argv[i][1]=='c') ) cutoff=atof(&argv[strlen(argv[i])>2?i:i+1][strlen(argv[i])>2?2:0]);
-  }
-  printf("scan range=[%i,%i], max scan difference=%.2f, max m/z difference=%.4f\n",start_scan, end_scan, max_scan_number_difference,max_precursor_difference); fflush(stdout);
-  
-  /* check MGF dataset D1 for number of MS/MS spectra */
-  
-  printf("entering MGF mode...done\n"); fflush(stdout);
-  if((dataset_1=fopen(dataset_1_filename,"r"))==NULL) {printf("error opening dataset 1 MGF file %s for reading",dataset_1_filename); return -1;}
-  printf("checking MGF dataset 1 (\"%s\")...",dataset_1_filename); fflush(stdout); 
-  size_D1=0;
-  while (fgets(line, 8192, dataset_1) != NULL)
-    {
-      if (strcmp(line,"\n")==0) continue;
-      p=strtok(line,"=");
-      if(strcmp("TITLE",p)==0) size_D1++;
-    }
-  printf("done (contains %i MS/MS spectra)\n",size_D1); fflush(stdout); fclose(dataset_1);
-    
-  if((dataset_2=fopen(dataset_2_filename,"r"))==NULL) {printf("error opening dataset 2 MGF file %s for reading",dataset_2_filename); return -1;}
-  printf("checking MGF dataset 2 (\"%s\")...",dataset_2_filename); fflush(stdout); 
-  size_D2=0;
-  while (fgets(line, 8192, dataset_2) != NULL)
-    {
-      if (strcmp(line,"\n")==0) continue;
-      p=strtok(line,"=");
-      if(strcmp("TITLE",p)==0) size_D2++;
-    }
-  printf("done (contains %i MS/MS spectra)\n",size_D2); fflush(stdout); fclose(dataset_2);
-  
-  
-  /* allocate memory */
-  printf("done\nallocating memory..."); fflush(stdout);
-  D1=(dataset_type*)malloc(size_D1*sizeof(dataset_type));
-  D2=(dataset_type*)malloc(size_D2*sizeof(dataset_type));
-  
-  
-  /* read in tandem mass spectra from MGF files */
-  
-  printf("done\nreading %i MS/MS spectra from %s...",size_D1,dataset_1_filename); fflush(stdout);
-  if((dataset_1=fopen(dataset_1_filename,"r"))==NULL) {printf("error opening dataset 1 MGF file %s for reading",dataset_1_filename); return -1;}
-  i=0; j=0;
-  while (fgets(line, 8192, dataset_1) != NULL)
-    {  
-      if (strcmp(line,"\n")==0) continue;
-      p=strtok(line," \t");
-      if(strspn("PEPMASS",p)>6) {
-	D1[i].precursorMz=atof(strpbrk(p,"0123456789"));
-	D1[i].mz=(double*)malloc(MAX_PEAKS*sizeof(double)); 
-	D1[i].intensity=(double*)malloc(MAX_PEAKS*sizeof(double));
-      }
-      if(strspn("CHARGE",p)>5) D1[i].charge=(char)atoi(strpbrk(p,"0123456789"));
-      if(isdigit(p[0])) {D1[i].mz[j]=atof(p); p=strtok('\0'," \t"); if(j<MAX_PEAKS) {D1[i].intensity[j]=atof(p); j++;}}
-      if(strspn("SCANS",p)>4) {D1[i].scan=(long)atol0(strpbrk(p,"0123456789")); continue;}
-      if(strcmp("END",p)==0) {D1[i].n_peaks=j; i++; j=0;}
-    }
-  
-  printf("done\nreading %i MS/MS spectra from %s...",size_D2,dataset_2_filename); fflush(stdout);
-  if((dataset_2=fopen(dataset_2_filename,"r"))==NULL) {printf("error opening dataset 2 MGF file %s for reading",dataset_2_filename); return -1;}
-  i=0; j=0;
-  while (fgets(line, 8192, dataset_2) != NULL)
-    {
-      if (strcmp(line,"\n")==0) continue;
-      p=strtok(line," \t");
-      if(strspn("PEPMASS",p)>6) {
-	D2[i].precursorMz=atof(strpbrk(p,"0123456789")); 
-	D2[i].mz=(double*)malloc(MAX_PEAKS*sizeof(double)); 
-	D2[i].intensity=(double*)malloc(MAX_PEAKS*sizeof(double));
-      }
-      if(strspn("CHARGE",p)>5) D2[i].charge=(char)atoi(strpbrk(p,"0123456789"));
-      if(isdigit(p[0])) {D2[i].mz[j]=atof(p); p=strtok('\0'," \t"); if(j<MAX_PEAKS) {D2[i].intensity[j]=atof(p); j++;}}
-      if(strspn("SCANS",p)>4) {D2[i].scan=(long)atol0(strpbrk(p,"0123456789")); continue;} // for Ben's MGFs from Lumos
-      if(strcmp("END",p)==0) {D2[i].n_peaks=j; i++; j=0;}
-    }
-  printf("done\n"); fflush(stdout);
-
-  printf("scaling, normalizing and binning %i MS/MS spectra from %s...",size_D1,dataset_1_filename); fflush(stdout);
-  for(j=0;j<size_D1;j++)
-    {
-      for(k=0;k<D1[j].n_peaks;k++) D1[j].intensity[k]=D1[j].intensity[k]>NOISE?sqrt(D1[j].intensity[k]):0; /* square root scaling and NOISE removal */
-      ssum=0; for(k=0;k<D1[j].n_peaks;k++) ssum+=D1[j].intensity[k]*D1[j].intensity[k]; rssum=sqrt(ssum); /* normalization against spectral vector magnitude */
-      for(k=0;k<N_BINS;k++) D1[j].bin[k]=0; /* set all bins to zero */
-      for(k=0;k<D1[j].n_peaks;k++) {D1[j].intensity[k]=D1[j].intensity[k]/rssum; if((D1[j].mz[k]>=MIN_MZ)&&(D1[j].mz[k]<MAX_MZ)) D1[j].bin[(long)floor(BIN_SIZE*(D1[j].mz[k]-MIN_MZ)+BIN_SIZE/2)]+=D1[j].intensity[k];}
-      ssum=0; for(k=0;k<N_BINS;k++) ssum+=D1[j].bin[k]*D1[j].bin[k]; rssum=sqrt(ssum);
-      for(k=0;k<N_BINS;k++) D1[j].bin[k]=D1[j].bin[k]/rssum; /* normalize binned spectra to binned vector magnitude */
-    }
-
-  printf("done\nscaling, normalizing and binning %i MS/MS spectra from %s...",size_D2,dataset_2_filename); fflush(stdout);
-  for(j=0;j<size_D2;j++)
-    {
-      for(k=0;k<D2[j].n_peaks;k++) D2[j].intensity[k]=D2[j].intensity[k]>NOISE?sqrt(D2[j].intensity[k]):0; /* square root scaling and NOISE removal */
-      ssum=0; for(k=0;k<D2[j].n_peaks;k++) ssum+=D2[j].intensity[k]*D2[j].intensity[k]; rssum=sqrt(ssum); /* normalization against spectral vector magnitude */
-      for(k=0;k<N_BINS;k++) D2[j].bin[k]=0; /* set all bins to zero */
-      for(k=0;k<D2[j].n_peaks;k++) {if((D2[j].mz[k]>=MIN_MZ)&&(D2[j].mz[k]<MAX_MZ)) D2[j].bin[(long)floor(BIN_SIZE*(D2[j].mz[k]-MIN_MZ)+BIN_SIZE/2)]+=D2[j].intensity[k];} /* populate bins */
-      ssum=0; for(k=0;k<N_BINS;k++) ssum+=D2[j].bin[k]*D2[j].bin[k]; rssum=sqrt(ssum);
-      for(k=0;k<N_BINS;k++) D2[j].bin[k]=D2[j].bin[k]/rssum; /* normalize binned spectra to binned vector magnitude */
-    }
-
-  
-  /* go through spectra (entries) in MGF file 1 and compare with those in MGF file 2 and vice versa */
-  printf("done\nmatching spectra..."); fflush(stdout);
-  sum_dot_prod=0.0; n_comparisons=0; gt_cutoff=0;
-  for(i=0;i<200;i++) histogram[i]=0;
-  
-  for(i=0;i<size_D1;i++)
-    {
-      // if(D1[i].scan<start_scan) continue;
-      // if(D1[i].scan>end_scan) continue;
-      max_dot_prod=0.0;
-      
-      for(j=0;j<size_D2;j++) {
-	if((D1[i].scan-D2[j].scan)>max_scan_number_difference) continue;
-	if((D2[j].scan-D1[i].scan)>max_scan_number_difference) break;
-	if(fabs(D2[j].precursorMz-D1[i].precursorMz)<max_precursor_difference) {
-	  dot_prod=0;
-	  for(k=0;k<N_BINS;k++) dot_prod+=D1[i].bin[k]*D2[j].bin[k];
-	  if(fabs(dot_prod)<=1.00) histogram[100+(int)floor(dot_prod*99.999999999999)]++;
-	  n_comparisons++;
-	  if(dot_prod>max_dot_prod) {max_dot_prod=dot_prod;}
+/* atof0 acts the same as atof, but handles a null pointer without crashing */
+static double atof0(const char *p) {
+	if (p == 0) {
+		return 0;
 	}
-      }
-      if(max_dot_prod>cutoff) gt_cutoff++;
-    }
-  for(i=0;i<size_D2;i++)
-    {
-      // if(D2[i].scan<start_scan) continue;
-      // if(D2[i].scan>end_scan) continue;
-      max_dot_prod=0.0;
-      
-      for(j=0;j<size_D1;j++) {
-	if((D2[i].scan-D1[j].scan)>max_scan_number_difference) continue;
-	if((D1[j].scan-D2[i].scan)>max_scan_number_difference) break;
-	if(fabs(D1[j].precursorMz-D2[i].precursorMz)<max_precursor_difference) {
-	  dot_prod=0;
-	  for(k=0;k<N_BINS;k++) dot_prod+=D2[i].bin[k]*D1[j].bin[k];
-	   if(fabs(dot_prod)<=1.00) histogram[100+(int)floor(dot_prod*99.999999999999)]++;
-	  n_comparisons++;
-	  if(dot_prod>max_dot_prod) {max_dot_prod=dot_prod;}
-	}
-      }
-      if(max_dot_prod>cutoff) gt_cutoff++; /* counting shared spectra from both datasets */
-    }
- 
-  printf("done\n");
-  
-  
-  /* print output to file */
-  
-  if((output=fopen(output_filename,"w"))==NULL) {printf("error opening output file %s for writing",output_filename); return -1;}
-  fprintf(output,"dataset_1\t%s\n",dataset_1_filename);
-  fprintf(output,"dataset_2\t%s\n",dataset_2_filename);
-  fprintf(output,"dataset_QC_1\t%.4f\n",(float)size_D1);
-  fprintf(output,"dataset_QC_2\t%.4f\n",(float)size_D2);
-  fprintf(output,"gt_cutoff\t%i\n",gt_cutoff);
-  fprintf(output,"fraction_gt_cutoff\t%1.10f\n",(double)gt_cutoff/(size_D1+size_D2)); // make symmetric
-  fprintf(output,"n_compared_spectra\t%i\n",n_comparisons);
-  fprintf(output,"histogram (interval, midpoint, comparisons)\n");
-  for(i=0;i<200;i++) fprintf(output,"histogram\t%1.3f\t%1.3f\t%1.3f\t%i\n",(double)(i-100)/100,(double)(i+1-100)/100,(double)(i+0.5-100)/100,histogram[i]);
-  fflush(output);
-  
-  
-  /* close files and free memory */
-  
-  fclose(output);
-  printf("freeing memory..."); fflush(stdout);
-  free(D1); free(D2);
-  printf("done\n"); fflush(stdout);
-  
-
-  /* return from main */
-  
-  return 0; 
+	return atof(p);
 }
 
+/* an implementation of quickselect for finding the intensity of the k:th most intense spectra (for filtering) */
+#define SWAP(x,y) {double temp=x; x=y; y=temp;}
+
+long partition(double a[], long left, long right, long pIndex) {
+	double pivot = a[pIndex];
+	SWAP(a[pIndex], a[right]);
+	pIndex = left;
+	for (long i = left; i < right; i++)
+		if (a[i] >= pivot) {
+			SWAP(a[i], a[pIndex]);
+			pIndex++;
+		}
+	SWAP(a[pIndex], a[right]);
+	return pIndex;
+}
+
+double quickSelect(double A[], long left, long right, long k) {
+	if (left == right)
+		return A[left];
+	long pIndex = left + rand() % (right - left + 1);
+	pIndex = partition(A, left, right, pIndex);
+	if (k == pIndex)
+		return A[k];
+	else if (k < pIndex)
+		return quickSelect(A, left, pIndex - 1, k);
+	else
+		return quickSelect(A, pIndex + 1, right, k);
+}
+
+/* compareMS2 main function */
+
+int main(int argc, char *argv[]) {
+	FILE *datasetA, *datasetB, *output;
+	char datasetAFilename[MAX_LEN], datasetBFilename[MAX_LEN],
+			outputFilename[MAX_LEN], temp[MAX_LEN], line[MAX_LEN], *p, metric,
+			qc;
+	long i, j, k, datasetAsize, datasetBsize, startScan, endScan, nComparisons,
+			minPeaks, maxPeaks, nBins, nPeaks, topN, histogram[HISTOGRAM_BINS],
+			greaterThanCutoff, setSAB, setSBA, datasetAActualCompared,
+			datasetBActualCompared;
+	double minBasepeakIntensity, minTotalIntensity, maxScanNumberDifference,
+			maxPrecursorDifference, cutoff, scaling, noise, minMz, maxMz,
+			binSize, *datasetAIntensities, *datasetBIntensities, datasetACutoff,
+			datasetBCutoff, dotProd, maxDotProd, dotProdSum, squareSum,
+			rootSquareSum;
+
+	typedef struct {
+		long scan; /* scan number */
+		double *mz; /* measured m/z */
+		double *intensity; /* measured intensities */
+		char charge; /* deconvoluted charge (in MGF file) */
+		double *bin; /* binned spectra */
+		double precursorMz; /* precursor m/z */
+		int nPeaks; /* number of peaks in spectrum */
+		double basePeakIntensity; /* basepeak intensity */
+		double totalIonCurrent; /* total ion current for spectrum */
+	} DatasetType;
+
+	DatasetType *A, *B;
+
+	/* parsing command line parameters */
+
+	if ((argc == 2)
+			&& ((strcmp(argv[1], "--help") == 0)
+					|| (strcmp(argv[1], "-help") == 0)
+					|| (strcmp(argv[1], "-h") == 0))) /* want help? */
+			{
+		printf(
+				"compareMS2 - (c) Magnus Palmblad 2010-2021\n\ncompareMS2 is developed to compare, globally, all MS/MS spectra between two datasets in MGF acquired under similar conditions, or aligned so that they are comparable. This may be useful for molecular phylogenetics based on shared peptide sequences quantified by the share of highly similar tandem mass spectra. The similarity between a pair of tandem mass spectra is calculated essentially as in SpectraST [see Lam et al. Proteomics 2007, 7, 655-667 (2007)].\n\nusage: compareMS2 -A <first dataset filename> -B <second dataset filename> [-R <first scan number>,<last scan number> -c <score cutoff, default=0.8> -o <output filename> -m<minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error in MS/MS> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>]\n");
+		return 0;
+	}
+
+	/* test for correct number of parameters */
+
+	if (argc < 3 || argc > 17) {
+		printf(
+				"usage: compareMS2 -A <first dataset filename> -B <second dataset filename> -R <first scan number>,<last scan number> [-c <score cutoff> -o <output filename> -m <minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>] (type compareMS2 --help for more information)\n");
+		return -1;
+	}
+
+	/* assign default values */
+
+	strcpy(outputFilename, "output.txt");
+	minBasepeakIntensity = DEFAULT_MIN_BASEPEAK_INTENSITY;
+	maxScanNumberDifference = DEFAULT_MAX_PRECURSOR_DIFFERENCE;
+	maxPrecursorDifference = 2.05;
+	startScan = DEFAULT_START_SCAN;
+	endScan = DEFAULT_END_SCAN;
+	cutoff = DEFAULT_CUTOFF;
+	scaling = DEFAULT_SCALING;
+	noise = DEFAULT_NOISE;
+	metric = DEFAULT_METRIC;
+	qc = DEFAULT_QC;
+	binSize = DEFAULT_BIN_SIZE;
+	minPeaks = DEFAULT_MIN_PEAKS;
+	maxPeaks = DEFAULT_MAX_PEAKS;
+	minMz = DEFAULT_MIN_MZ;
+	maxMz = DEFAULT_MAX_MZ;
+	nBins = DEFAULT_N_BINS;
+	topN = DEFAULT_TOP_N;
+
+	/* read and replace parameter values */
+
+	for (i = 1; i < argc; i++) {
+		if ((argv[i][0] == '-') && (argv[i][1] == 'A')) /* dataset A filename */
+			strcpy(datasetAFilename,
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'B')) /* dataset B filename */
+			strcpy(datasetBFilename,
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'R')) { /* range of spectra (scans) */
+			strcpy(temp,
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+			p = strtok(temp, ",");
+			startScan = atol0(p);
+			p = strtok('\0', ",");
+			endScan = atol0(p);
+		}
+		if ((argv[i][0] == '-') && (argv[i][1] == 'o')) /* output filename */
+			strcpy(outputFilename,
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'p')) /* maximum precursor m/z difference */
+			maxPrecursorDifference = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'm')) { /* minimum basepeak and total intensity */
+			strcpy(temp,
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+			p = strtok(temp, ",");
+			minBasepeakIntensity = atof(p);
+			p = strtok('\0', ",");
+			minTotalIntensity = atof(p);
+		}
+		if ((argv[i][0] == '-') && (argv[i][1] == 'w')) /* maximum scan number difference */
+			maxScanNumberDifference = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'c')) /* cutoff for spectral similarity */
+			cutoff = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 's')) /* intensity scaling for dot product */
+			scaling = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'n')) /* noise threshold for dot product */
+			noise = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'd')) /* version of set distance metric */
+			metric = atoi(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'q')) /* version of QC metric */
+			qc = atoi(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'N')) /* compare only the N most intense spectra */
+			topN = atoi(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'b')) /* bin size (advanced parameter) */
+			binSize = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'I')) /* minimum number of peaks (advanced parameter) */
+			minPeaks = atoi(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'L')) /* minimum m/z for dot product (advanced parameter) */
+			minMz = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'U')) /* maximum m/z for dot product (advanced parameter) */
+			maxMz = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+	}
+
+	if (((maxMz - minMz) / binSize) == floor((maxMz - minMz) / binSize))
+		nBins = (int) ((maxMz - minMz) / binSize);
+	else
+		nBins = (int) ((maxMz - minMz) / binSize) + 1;
+	printf("spectrum bin size %1.3f Th -> %i bins in [%.3f,%.3f]\n", binSize,
+			nBins, minMz, maxMz);
+	fflush(stdout);
+
+	printf(
+			"scan range=[%i,%i], max scan difference=%.2f, max m/z difference=%.4f, scaling=^%.2f, noise=%.1f\n",
+			startScan, endScan, maxScanNumberDifference, maxPrecursorDifference,
+			scaling, noise);
+	fflush(stdout);
+
+	/* check MGF dataset A for number of MS/MS spectra */
+	if ((datasetA = fopen(datasetAFilename, "r")) == NULL) {
+		printf("error opening dataset A %s for reading", datasetAFilename);
+		return -1;
+	}
+	printf("checking dataset A (\"%s\")...", datasetAFilename);
+	fflush(stdout);
+	datasetAsize = 0;
+	nPeaks = 0;
+	maxPeaks = 0;
+	while (fgets(line, 8192, datasetA) != NULL) {
+		if (strcmp(line, "\n") == 0)
+			continue;
+		p = strtok(line, "=");
+		if (strcmp("TITLE", p) == 0) {
+			datasetAsize++;
+			if (nPeaks > maxPeaks)
+				maxPeaks = nPeaks;
+			nPeaks = 0;
+		}
+		if (isdigit(p[0]))
+			nPeaks++;
+	}
+	printf("done (contains %i MS2 spectra)\n", datasetAsize);
+	fflush(stdout);
+	fclose(datasetA);
+
+	if ((topN > -1) && (topN < datasetAsize)) {
+		printf("filtering top-%i spectra...", topN);
+		fflush(stdout);
+		datasetAIntensities = malloc(datasetAsize * sizeof(double));
+		if ((datasetA = fopen(datasetAFilename, "r")) == NULL) {
+			printf("error opening dataset A %s for reading", datasetAFilename);
+			return -1;
+		}
+		i = -1;
+		while (fgets(line, 8192, datasetA) != NULL) {
+			if (strcmp(line, "\n") == 0)
+				continue;
+			p = strtok(line, " \t");
+			if (strcmp("BEGIN", p) == 0) {
+				i++;
+				datasetAIntensities[i] = 0.0;
+			}
+			if (isdigit(p[0])) {
+				p = strtok('\0', " \t");
+				datasetAIntensities[i] += atof0(p);
+			}
+		}
+
+		datasetACutoff = quickSelect(datasetAIntensities, 0, i, topN); // quickselect top-Nth intensity
+		printf("done (ion intensity threshold %.3f)\n", datasetACutoff);
+		fflush(stdout);
+		fclose(datasetA);
+	}
+
+	if ((datasetB = fopen(datasetBFilename, "r")) == NULL) {
+		printf("error opening dataset B %s for reading", datasetBFilename);
+		return -1;
+	}
+	printf("checking dataset B (\"%s\")...", datasetBFilename);
+	fflush(stdout);
+	datasetBsize = 0;
+	nPeaks = 0;
+	while (fgets(line, 8192, datasetB) != NULL) {
+		if (strcmp(line, "\n") == 0)
+			continue;
+		p = strtok(line, "=");
+		if (strcmp("TITLE", p) == 0) {
+			datasetBsize++;
+			if (nPeaks > maxPeaks)
+				maxPeaks = nPeaks;
+			nPeaks = 0;
+		}
+	}
+	printf("done (contains %i MS2 spectra)\n", datasetBsize);
+	fflush(stdout);
+	fclose(datasetB);
+
+	if ((topN > -1) && (topN < datasetBsize)) {
+		printf("filtering top-%i spectra...", topN);
+		fflush(stdout);
+		datasetBIntensities = malloc(datasetBsize * sizeof(double));
+		if ((datasetB = fopen(datasetBFilename, "r")) == NULL) {
+			printf("error opening dataset B %s for reading", datasetBFilename);
+			return -1;
+		}
+		i = -1;
+		while (fgets(line, 8192, datasetB) != NULL) {
+			if (strcmp(line, "\n") == 0)
+				continue;
+			p = strtok(line, " \t");
+			if (strcmp("BEGIN", p) == 0) {
+				i++;
+				datasetBIntensities[i] = 0.0;
+			}
+			if (isdigit(p[0])) {
+				p = strtok('\0', " \t");
+				datasetBIntensities[i] += atof0(p);
+			}
+		}
+
+		datasetBCutoff = quickSelect(datasetBIntensities, 0, i, topN); /* quickselect top-Nth intensity */
+		printf("done (ion intensity threshold %.3f)\n", datasetBCutoff);
+		fflush(stdout);
+		fclose(datasetB);
+	}
+
+	/* allocate memory */
+
+	printf("allocating memory...");
+	fflush(stdout);
+	A = (DatasetType*) malloc(datasetAsize * sizeof(DatasetType));
+	B = (DatasetType*) malloc(datasetBsize * sizeof(DatasetType));
+
+	/* read in tandem mass spectra from MGF files */
+
+	printf("done\nreading %i MS2 spectra from %s...", datasetAsize,
+			datasetAFilename);
+	fflush(stdout);
+	if ((datasetA = fopen(datasetAFilename, "r")) == NULL) {
+		printf("error opening dataset A %s for reading", datasetAFilename);
+		return -1;
+	}
+	i = 0;
+	j = 0;
+	while (fgets(line, 8192, datasetA) != NULL) {
+		if (strcmp(line, "\n") == 0)
+			continue;
+		p = strtok(line, " \t");
+		if (strspn("PEPMASS", p) > 6) {
+			A[i].precursorMz = atof(strpbrk(p, "0123456789"));
+			A[i].mz = (double*) malloc(maxPeaks * sizeof(double));
+			A[i].intensity = (double*) malloc(maxPeaks * sizeof(double));
+			A[i].bin = (double*) malloc(nBins * sizeof(double));
+		}
+		if (strspn("CHARGE", p) > 5)
+			A[i].charge = (char) atoi(strpbrk(p, "0123456789"));
+		if (isdigit(p[0])) {
+			A[i].mz[j] = atof(p);
+			p = strtok('\0', " \t");
+			if (j < maxPeaks) {
+				A[i].intensity[j] = atof(p);
+				j++;
+			}
+		}
+		if (strspn("SCANS", p) > 4) {
+			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
+			continue;
+		}
+		if (strcmp("END", p) == 0) {
+			A[i].nPeaks = j;
+			i++;
+			j = 0;
+		}
+	}
+
+	printf("done\nreading %i MS2 spectra from %s...", datasetBsize,
+			datasetBFilename);
+	fflush(stdout);
+	if ((datasetB = fopen(datasetBFilename, "r")) == NULL) {
+		printf("error opening dataset B %s for reading", datasetBFilename);
+		return -1;
+	}
+	i = 0;
+	j = 0;
+	while (fgets(line, 8192, datasetB) != NULL) {
+		if (strcmp(line, "\n") == 0)
+			continue;
+		p = strtok(line, " \t");
+		if (strspn("PEPMASS", p) > 6) {
+			B[i].precursorMz = atof(strpbrk(p, "0123456789"));
+			B[i].mz = (double*) malloc(maxPeaks * sizeof(double));
+			B[i].intensity = (double*) malloc(maxPeaks * sizeof(double));
+			B[i].bin = (double*) malloc(nBins * sizeof(double));
+		}
+		if (strspn("CHARGE", p) > 5)
+			B[i].charge = (char) atoi(strpbrk(p, "0123456789"));
+		if (isdigit(p[0])) {
+			B[i].mz[j] = atof(p);
+			p = strtok('\0', " \t");
+			if (j < maxPeaks) {
+				B[i].intensity[j] = atof(p);
+				j++;
+			}
+		}
+		if (strspn("SCANS", p) > 4) {
+			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
+			continue;
+		}
+		if (strcmp("END", p) == 0) {
+			B[i].nPeaks = j;
+			i++;
+			j = 0;
+		}
+	}
+	printf("done\n");
+	fflush(stdout);
+
+	printf("scaling, normalizing and binning %i MS2 spectra from %s..",
+			datasetAsize, datasetAFilename);
+	fflush(stdout);
+	for (j = 0; j < datasetAsize; j++) {
+		for (k = 0; k < A[j].nPeaks; k++)
+			A[j].intensity[k] =
+					A[j].intensity[k] > noise ?
+							pow(A[j].intensity[k], scaling) : 0; /* nth root scaling and noise removal */
+		squareSum = 0;
+		for (k = 0; k < A[j].nPeaks; k++)
+			squareSum += A[j].intensity[k] * A[j].intensity[k];
+		rootSquareSum = sqrt(squareSum); /* normalization against spectral vector magnitude */
+		for (k = 0; k < nBins; k++)
+			A[j].bin[k] = 0; /* set all bins to zero */
+		for (k = 0; k < A[j].nPeaks; k++) {
+			A[j].intensity[k] = A[j].intensity[k] / rootSquareSum;
+			if ((A[j].mz[k] >= minMz) && (A[j].mz[k] < maxMz))
+				A[j].bin[(long) floor(
+						binSize * (A[j].mz[k] - minMz) + binSize / 2)] +=
+						A[j].intensity[k];
+		}
+		squareSum = 0;
+		for (k = 0; k < nBins; k++)
+			squareSum += A[j].bin[k] * A[j].bin[k];
+		rootSquareSum = sqrt(squareSum);
+		for (k = 0; k < nBins; k++)
+			A[j].bin[k] = A[j].bin[k] / rootSquareSum; /* normalize binned spectra to binned vector magnitude */
+	}
+
+	printf(".done\nscaling, normalizing and binning %i MS2 spectra from %s..",
+			datasetBsize, datasetBFilename);
+	fflush(stdout);
+	for (j = 0; j < datasetBsize; j++) {
+		for (k = 0; k < B[j].nPeaks; k++)
+			B[j].intensity[k] =
+					B[j].intensity[k] > noise ?
+							pow(B[j].intensity[k], scaling) : 0; /* nth root scaling and noise removal */
+		squareSum = 0;
+		for (k = 0; k < B[j].nPeaks; k++)
+			squareSum += B[j].intensity[k] * B[j].intensity[k];
+		rootSquareSum = sqrt(squareSum); /* normalization against spectral vector magnitude */
+		for (k = 0; k < nBins; k++)
+			B[j].bin[k] = 0; /* set all bins to zero */
+		for (k = 0; k < B[j].nPeaks; k++) {
+			if ((B[j].mz[k] >= minMz) && (B[j].mz[k] < maxMz))
+				B[j].bin[(long) floor(
+						binSize * (B[j].mz[k] - minMz) + binSize / 2)] +=
+						B[j].intensity[k];
+		} /* populate bins */
+		squareSum = 0;
+		for (k = 0; k < nBins; k++)
+			squareSum += B[j].bin[k] * B[j].bin[k];
+		rootSquareSum = sqrt(squareSum);
+		for (k = 0; k < nBins; k++)
+			B[j].bin[k] = B[j].bin[k] / rootSquareSum; /* normalize binned spectra to binned vector magnitude */
+	}
+
+	/* go through spectra (entries) in MGF file 1 and compare with those in MGF file 2 and vice versa */
+
+	printf(".done\nmatching spectra and computing set distance.");
+	fflush(stdout);
+	dotProdSum = 0.0;
+	nComparisons = 0;
+	greaterThanCutoff = 0;
+	setSAB = 0;
+	setSBA = 0;
+	datasetAActualCompared = 0;
+	datasetBActualCompared = 0;
+	for (i = 0; i < 200; i++)
+		histogram[i] = 0;
+
+	for (i = 0; i < datasetAsize; i++) {
+		if (topN > -1)
+			if (topN < datasetAsize)
+				if (datasetAIntensities[i] <= datasetACutoff)
+					continue; /* compare only top-N spectra (including spectra of same intensity as Nth spectrum) */
+		/* if(A[i].scan<start_scan) continue; */
+		/* if(A[i].scan>end_scan) continue; */
+
+		maxDotProd = 0.0;
+		datasetAActualCompared++;
+
+		for (j = 0; j < datasetBsize; j++) {
+			if (topN > -1)
+				if (topN < datasetBsize)
+					if (datasetBIntensities[j] <= datasetBCutoff)
+						continue;
+			if ((A[i].scan - B[j].scan) > maxScanNumberDifference)
+				continue;
+			if ((B[j].scan - A[i].scan) > maxScanNumberDifference)
+				break;
+			if (fabs(B[j].precursorMz - A[i].precursorMz)
+					< maxPrecursorDifference) {
+				dotProd = 0;
+				for (k = 0; k < nBins; k++)
+					dotProd += A[i].bin[k] * B[j].bin[k];
+				if (fabs(dotProd) <= 1.00)
+					histogram[100 + (int) floor(dotProd * 99.999999999999)]++;
+				nComparisons++;
+				if (dotProd > maxDotProd) {
+					maxDotProd = dotProd;
+				}
+			}
+		}
+		if (maxDotProd > cutoff)
+			greaterThanCutoff++;
+		if (maxDotProd > cutoff)
+			setSAB++;
+	}
+
+	printf(".");
+	fflush(stdout);
+
+	for (i = 0; i < datasetBsize; i++) {
+		if (topN > -1)
+			if (topN < datasetBsize)
+				if (datasetBIntensities[i] <= datasetBCutoff)
+					continue;
+		/* if(B[i].scan<startScan) continue; */
+		/* if(B[i].scan>end_scan) continue; */
+		maxDotProd = 0.0;
+		datasetBActualCompared++;
+		for (j = 0; j < datasetAsize; j++) {
+			if (topN > -1)
+				if (topN < datasetAsize)
+					if (datasetAIntensities[j] <= datasetACutoff)
+						continue;
+			if ((B[i].scan - A[j].scan) > maxScanNumberDifference)
+				continue;
+			if ((A[j].scan - B[i].scan) > maxScanNumberDifference)
+				break;
+			if (fabs(A[j].precursorMz - B[i].precursorMz)
+					< maxPrecursorDifference) {
+				dotProd = 0;
+				for (k = 0; k < nBins; k++)
+					dotProd += B[i].bin[k] * A[j].bin[k];
+				if (fabs(dotProd) <= 1.00)
+					histogram[100 + (int) floor(dotProd * 99.999999999999)]++;
+				/* nComparisons++; */
+				if (dotProd > maxDotProd) {
+					maxDotProd = dotProd;
+				}
+			}
+		}
+		if (maxDotProd > cutoff)
+			greaterThanCutoff++; /* counting shared spectra from both datasets */
+		if (maxDotProd > cutoff)
+			setSBA++;
+	}
+
+	printf(
+			".done (compared %i spectra from dataset A with %i spectra from dataset B)\nwriting results to file...",
+			datasetAActualCompared, datasetBActualCompared);
+
+	/* print output to file */
+
+	if ((output = fopen(outputFilename, "w")) == NULL) {
+		printf("error opening output file %s for writing", outputFilename);
+		return -1;
+	}
+	fprintf(output, "dataset_A\t%s\n", datasetAFilename);
+	fprintf(output, "dataset_B\t%s\n", datasetBFilename);
+	if (metric == 0)
+		fprintf(output, "set_distance\t%1.10f\n",
+				(double) greaterThanCutoff / nComparisons); /* original metric */
+	if (metric == 1)
+		fprintf(output, "set_distance\t%1.10f\n",
+				(double) greaterThanCutoff / (datasetAsize + datasetBsize)); /* symmetric metric */
+	if (metric == 2)
+		fprintf(output, "set_distance\t%1.10f\n",
+				(double) setSAB / (2 * datasetAsize)
+						+ (double) setSBA / (2 * datasetBsize)); /* compareMS2 2.0 symmetric metric */
+	fprintf(output, "set_metric\t%i\n", metric);
+	fprintf(output,
+			"scan_range\t%i\t%i\nmax_scan_diff\t%.5f\nmax_m/z_diff\t%.5f\nscaling_power\t%.5f\nnoise_threshold\t%.5f\n",
+			startScan, endScan, maxScanNumberDifference, maxPrecursorDifference,
+			scaling, noise);
+	if (qc == 0)
+		fprintf(output, "dataset_A_QC\t%.4f\n", (float) datasetAsize);
+	if (qc == 0)
+		fprintf(output, "dataset_B_QC\t%.4f\n", (float) datasetBsize);
+	fprintf(output, "n_gt_cutoff\t%i\n", greaterThanCutoff);
+	fprintf(output, "n_comparisons\t%i\n", nComparisons);
+	fprintf(output, "min_peaks\t%i\n", minPeaks);
+	fprintf(output, "max_peaks\t%i\n", maxPeaks);
+	fprintf(output, "m/z_range\t%.4f\t%.4f\n", minMz, maxMz);
+	fprintf(output, "m/z_bin_size\t%.4f\n", binSize);
+	fprintf(output, "n_m/z_bins\t%i\n", nBins);
+	/* fprintf(output,"histogram (interval, midpoint, comparisons)\n"); */
+	for (i = 0; i < 200; i++)
+		fprintf(output, "histogram\t%1.3f\t%1.3f\t%1.3f\t%i\n",
+				(double) (i - 100) / 100, (double) (i + 1 - 100) / 100,
+				(double) (i + 0.5 - 100) / 100, histogram[i]);
+	fflush(output);
+
+	/* close files and free memory */
+
+	fclose(output);
+	printf("done\nfreeing memory...");
+	fflush(stdout);
+	free(A);
+	free(B);
+	printf("done\n");
+	fflush(stdout);
+
+	/* return from main */
+
+	return 0;
+}
