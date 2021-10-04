@@ -1,5 +1,5 @@
 # compareMS2
-compareMS2 calculates the similarity between tandem mass spectrometry datasets.
+compareMS2 calculates the global similarity between tandem mass spectrometry datasets.
 
 [1. Introduction](#1-Introduction)  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[1.1 What is compareMS2?](#11-What-is-compareMS2)  
