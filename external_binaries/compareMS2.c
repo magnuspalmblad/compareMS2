@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
-		datasetACutoff = quickSelect(datasetAIntensities, 0, i, topN); // quickselect top-Nth intensity
+		datasetACutoff = quickSelect(datasetAIntensities, 0, i, topN); /* quickselect top-Nth intensity */
 		printf("done (ion intensity threshold %.3f)\n", datasetACutoff);
 		fflush(stdout);
 		fclose(datasetA);
