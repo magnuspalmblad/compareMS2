@@ -1,17 +1,31 @@
 /*                                                                                                                   */
 /* compareMS2 - comparison of tandem mass spectra datasets, e.g. from LC-MS/MS                                       */
 /*                                                                                                                   */
-/* Copyright (c) Magnus Palmblad 2010-2021                                                                           */
+/* MIT License                                                                                                       */
 /*                                                                                                                   */
-/* This program is free software; you can redistribute it and/or modify it under the terms of the                    */
-/* Creative Commons Attribution-Share Alike 3.0 License (http://creativecommons.org/licenses/by-sa/3.0/)             */
+/* Copyright (c) 2021 Magnus Palmblad                                                                                */
 /*                                                                                                                   */
-/* This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;                         */
-/* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                         */
+/* Permission is hereby granted, free of charge, to any person obtaining a copy                                      */
+/* of this software and associated documentation files (the "Software"), to deal                                     */
+/* in the Software without restriction, including without limitation the rights                                      */
+/* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell                                         */
+/* copies of the Software, and to permit persons to whom the Software is                                             */
+/* furnished to do so, subject to the following conditions:                                                          */
+/*                                                                                                                   */
+/* The above copyright notice and this permission notice shall be included in all                                    */
+/* copies or substantial portions of the Software.                                                                   */
+/*                                                                                                                   */
+/* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR                                        */
+/* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,                                          */
+/* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE                                       */
+/* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER                                            */
+/* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,                                     */
+/* OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE                                     */
+/* SOFTWARE.                                                                                                         */
 /*                                                                                                                   */
 /* Contact information: n.m.palmblad@lumc.nl                                                                         */
 /*                                                                                                                   */
-/* compile with gcc -o compareMS2 compareMS2.c or x86_64-w64-mingw32-gcc.exe compareMS2.c -o compareMS2              */
+/* Compile with gcc -o compareMS2 compareMS2.c or x86_64-w64-mingw32-gcc compareMS2.c -o compareMS2                  */
 /*                                                                                                                   */
 
 #include <stdio.h>
