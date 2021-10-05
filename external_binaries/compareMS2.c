@@ -104,17 +104,17 @@ double quickSelect(double A[], long left, long right, long k) {
 int main(int argc, char *argv[]) {
 	FILE *datasetA, *datasetB, *output;
 	char datasetAFilename[MAX_LEN], datasetBFilename[MAX_LEN],
-			outputFilename[MAX_LEN], temp[MAX_LEN], line[MAX_LEN], *p, metric,
-			qc;
+	outputFilename[MAX_LEN], temp[MAX_LEN], line[MAX_LEN], *p, metric,
+	qc;
 	long i, j, k, datasetAsize, datasetBsize, startScan, endScan, nComparisons,
-			minPeaks, maxPeaks, nBins, nPeaks, topN, histogram[HISTOGRAM_BINS],
-			greaterThanCutoff, setSAB, setSBA, datasetAActualCompared,
-			datasetBActualCompared;
+	minPeaks, maxPeaks, nBins, nPeaks, topN, histogram[HISTOGRAM_BINS],
+	greaterThanCutoff, sAB, sBA, datasetAActualCompared,
+	datasetBActualCompared;
 	double minBasepeakIntensity, minTotalIntensity, maxScanNumberDifference,
-			maxPrecursorDifference, cutoff, scaling, noise, minMz, maxMz,
-			binSize, *datasetAIntensities, *datasetBIntensities, datasetACutoff,
-			datasetBCutoff, dotProd, maxDotProd, dotProdSum, squareSum,
-			rootSquareSum;
+	maxPrecursorDifference, cutoff, scaling, noise, minMz, maxMz,
+	binSize, *datasetAIntensities, *datasetBIntensities, datasetACutoff,
+	datasetBCutoff, dotProd, maxDotProd, dotProdSum, squareSum,
+	rootSquareSum;
 
 	typedef struct {
 		long scan; /* scan number */
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
 			&& ((strcmp(argv[1], "--help") == 0)
 					|| (strcmp(argv[1], "-help") == 0)
 					|| (strcmp(argv[1], "-h") == 0))) /* want help? */
-			{
+	{
 		printf(
 				"compareMS2 - (c) Magnus Palmblad 2010-2021\n\ncompareMS2 is developed to compare, globally, all MS/MS spectra between two datasets in MGF acquired under similar conditions, or aligned so that they are comparable. This may be useful for molecular phylogenetics based on shared peptide sequences quantified by the share of highly similar tandem mass spectra. The similarity between a pair of tandem mass spectra is calculated essentially as in SpectraST [see Lam et al. Proteomics 2007, 7, 655-667 (2007)].\n\nusage: compareMS2 -A <first dataset filename> -B <second dataset filename> [-R <first scan number>,<last scan number> -c <score cutoff, default=0.8> -o <output filename> -m<minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error in MS/MS> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>]\n");
 		return 0;
@@ -177,15 +177,15 @@ int main(int argc, char *argv[]) {
 		if ((argv[i][0] == '-') && (argv[i][1] == 'A')) /* dataset A filename */
 			strcpy(datasetAFilename,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'B')) /* dataset B filename */
 			strcpy(datasetBFilename,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'R')) { /* range of spectra (scans) */
 			strcpy(temp,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 			p = strtok(temp, ",");
 			startScan = atol0(p);
 			p = strtok('\0', ",");
@@ -194,15 +194,15 @@ int main(int argc, char *argv[]) {
 		if ((argv[i][0] == '-') && (argv[i][1] == 'o')) /* output filename */
 			strcpy(outputFilename,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'p')) /* maximum precursor m/z difference */
 			maxPrecursorDifference = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'm')) { /* minimum basepeak and total intensity */
 			strcpy(temp,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 			p = strtok(temp, ",");
 			minBasepeakIntensity = atof(p);
 			p = strtok('\0', ",");
@@ -211,47 +211,47 @@ int main(int argc, char *argv[]) {
 		if ((argv[i][0] == '-') && (argv[i][1] == 'w')) /* maximum scan number difference */
 			maxScanNumberDifference = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'c')) /* cutoff for spectral similarity */
 			cutoff = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 's')) /* intensity scaling for dot product */
 			scaling = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'n')) /* noise threshold for dot product */
 			noise = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'd')) /* version of set distance metric */
 			metric = atoi(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'q')) /* version of QC metric */
 			qc = atoi(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'N')) /* compare only the N most intense spectra */
 			topN = atoi(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'b')) /* bin size (advanced parameter) */
 			binSize = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'I')) /* minimum number of peaks (advanced parameter) */
 			minPeaks = atoi(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'L')) /* minimum m/z for dot product (advanced parameter) */
 			minMz = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'U')) /* maximum m/z for dot product (advanced parameter) */
 			maxMz = atof(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
-							strlen(argv[i]) > 2 ? 2 : 0]);
+														   strlen(argv[i]) > 2 ? 2 : 0]);
 	}
 
 	if (((maxMz - minMz) / binSize) == floor((maxMz - minMz) / binSize))
@@ -486,7 +486,7 @@ int main(int argc, char *argv[]) {
 			if ((A[j].mz[k] >= minMz) && (A[j].mz[k] < maxMz))
 				A[j].bin[(long) floor(
 						binSize * (A[j].mz[k] - minMz) + binSize / 2)] +=
-						A[j].intensity[k];
+								A[j].intensity[k];
 		}
 		squareSum = 0;
 		for (k = 0; k < nBins; k++)
@@ -514,7 +514,7 @@ int main(int argc, char *argv[]) {
 			if ((B[j].mz[k] >= minMz) && (B[j].mz[k] < maxMz))
 				B[j].bin[(long) floor(
 						binSize * (B[j].mz[k] - minMz) + binSize / 2)] +=
-						B[j].intensity[k];
+								B[j].intensity[k];
 		} /* populate bins */
 		squareSum = 0;
 		for (k = 0; k < nBins; k++)
@@ -531,8 +531,8 @@ int main(int argc, char *argv[]) {
 	dotProdSum = 0.0;
 	nComparisons = 0;
 	greaterThanCutoff = 0;
-	setSAB = 0;
-	setSBA = 0;
+	sAB = 0;
+	sBA = 0;
 	datasetAActualCompared = 0;
 	datasetBActualCompared = 0;
 	for (i = 0; i < 200; i++)
@@ -574,7 +574,7 @@ int main(int argc, char *argv[]) {
 		if (maxDotProd > cutoff)
 			greaterThanCutoff++;
 		if (maxDotProd > cutoff)
-			setSAB++;
+			sAB++;
 	}
 
 	printf(".");
@@ -614,7 +614,7 @@ int main(int argc, char *argv[]) {
 		if (maxDotProd > cutoff)
 			greaterThanCutoff++; /* counting shared spectra from both datasets */
 		if (maxDotProd > cutoff)
-			setSBA++;
+			sBA++;
 	}
 
 	printf(
@@ -629,16 +629,35 @@ int main(int argc, char *argv[]) {
 	}
 	fprintf(output, "dataset_A\t%s\n", datasetAFilename);
 	fprintf(output, "dataset_B\t%s\n", datasetBFilename);
-	if (metric == 0)
-		fprintf(output, "set_distance\t%1.10f\n",
-				(double) greaterThanCutoff / nComparisons); /* original metric */
-	if (metric == 1)
-		fprintf(output, "set_distance\t%1.10f\n",
-				(double) greaterThanCutoff / (datasetAsize + datasetBsize)); /* symmetric metric */
-	if (metric == 2)
-		fprintf(output, "set_distance\t%1.10f\n",
-				(double) setSAB / (2 * datasetAsize)
-						+ (double) setSBA / (2 * datasetBsize)); /* compareMS2 2.0 symmetric metric */
+	if (metric == 0) /* original metric */
+	{
+		if (greaterThanCutoff > 0)
+			fprintf(output, "set_distance\t%1.10f\n",
+					(double) nComparisons / greaterThanCutoff);
+		if (greaterThanCutoff == 0)
+			fprintf(output, "set_distance\tINF\n");
+	}
+	if (metric == 1) /* symmetric metric */
+	{
+		if (greaterThanCutoff > 0)
+			fprintf(output, "set_distance\t%1.10f\n",
+					(double) (datasetAsize + datasetBsize) / greaterThanCutoff);
+		if (greaterThanCutoff == 0)
+			fprintf(output, "set_distance\tINF\n");
+	}
+	if (metric == 2) { /* compareMS2 2.0 symmetric metric */
+		if ((sAB + sBA) > 0) {
+			fprintf(output, "set_distance\t%1.10f\n",
+					1.0
+					/ ((double) sAB / (2 * datasetAsize)
+							+ (double) sBA / (2 * datasetBsize)) - 1.0);
+		}
+		if ((sAB + sBA) == 0) { /* distance between sets with no similar spectra */
+			fprintf(output, "set_distance\t%1.10f\n",
+					(4.0 * (double) datasetAsize * datasetBsize)
+					/ (datasetAsize + datasetBsize) - 1.0);
+		}
+	}
 	fprintf(output, "set_metric\t%i\n", metric);
 	fprintf(output,
 			"scan_range\t%i\t%i\nmax_scan_diff\t%.5f\nmax_m/z_diff\t%.5f\nscaling_power\t%.5f\nnoise_threshold\t%.5f\n",
