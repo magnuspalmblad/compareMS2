@@ -53,6 +53,8 @@
 #define	DEFAULT_MAX_MZ 2000
 #define	DEFAULT_N_BINS 9455
 #define	DEFAULT_TOP_N -1
+#define DEFAULT_EXPERIMENTAL_FEATURES 0
+#define MASS_DIFF_HISTOGRAM_BINS 320
 
 /* atol0 acts the same as atol, but handles a null pointer without crashing */
 static int atol0(const char *p) {
@@ -104,10 +106,11 @@ double quickSelect(double A[], long left, long right, long k) {
 int main(int argc, char *argv[]) {
 	FILE *datasetA, *datasetB, *output;
 	char datasetAFilename[MAX_LEN], datasetBFilename[MAX_LEN],
-			outputFilename[MAX_LEN], temp[MAX_LEN], line[MAX_LEN], *p, metric,
-			qc;
+			outputFilename[MAX_LEN], experimentalOutputFilename[MAX_LEN],
+			temp[MAX_LEN], line[MAX_LEN], *p, metric, qc, experimentalFeatures;
 	long i, j, k, datasetAsize, datasetBsize, startScan, endScan, nComparisons,
 			minPeaks, maxPeaks, nBins, nPeaks, topN, histogram[HISTOGRAM_BINS],
+			massDiffHistogram[HISTOGRAM_BINS], **massDiffDotProductHistogram,
 			greaterThanCutoff, sAB, sBA, datasetAActualCompared,
 			datasetBActualCompared;
 	double minBasepeakIntensity, minTotalIntensity, maxScanNumberDifference,
@@ -170,6 +173,8 @@ int main(int argc, char *argv[]) {
 	maxMz = DEFAULT_MAX_MZ;
 	nBins = DEFAULT_N_BINS;
 	topN = DEFAULT_TOP_N;
+	experimentalFeatures = DEFAULT_EXPERIMENTAL_FEATURES;
+	strcpy(experimentalOutputFilename, "experimental_output.txt");
 
 	/* read and replace parameter values */
 
@@ -250,6 +255,10 @@ int main(int argc, char *argv[]) {
 							strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'U')) /* maximum m/z for dot product (advanced parameter) */
 			maxMz = atof(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'x')) /* level of experimental features enabled */
+			experimentalFeatures = atoi(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
 							strlen(argv[i]) > 2 ? 2 : 0]);
 	}
@@ -382,6 +391,13 @@ int main(int argc, char *argv[]) {
 	fflush(stdout);
 	A = (DatasetType*) malloc(datasetAsize * sizeof(DatasetType));
 	B = (DatasetType*) malloc(datasetBsize * sizeof(DatasetType));
+	if (experimentalFeatures == 1) {
+		massDiffDotProductHistogram = (long**) malloc(
+		MASS_DIFF_HISTOGRAM_BINS * sizeof(long*));
+		for (i = 0; i < MASS_DIFF_HISTOGRAM_BINS; i++)
+			massDiffDotProductHistogram[i] = malloc(
+			HISTOGRAM_BINS * sizeof(long));
+	}
 
 	/* read in tandem mass spectra from MGF files */
 
@@ -524,7 +540,7 @@ int main(int argc, char *argv[]) {
 			B[j].bin[k] = B[j].bin[k] / rootSquareSum; /* normalize binned spectra to binned vector magnitude */
 	}
 
-	/* go through spectra (entries) in MGF file 1 and compare with those in MGF file 2 and vice versa */
+	/* go through spectra (entries) in dataset A and compare with those in dataset B and vice versa */
 
 	printf(".done\nmatching spectra and computing set distance.");
 	fflush(stdout);
@@ -535,8 +551,15 @@ int main(int argc, char *argv[]) {
 	sBA = 0;
 	datasetAActualCompared = 0;
 	datasetBActualCompared = 0;
-	for (i = 0; i < 200; i++)
+	for (i = 0; i < HISTOGRAM_BINS; i++) {
 		histogram[i] = 0;
+		massDiffHistogram[i] = 0;
+	}
+	if (experimentalFeatures == 1) {
+		for (i = 0; i < HISTOGRAM_BINS; i++)
+			for (j = 0; j < MASS_DIFF_HISTOGRAM_BINS; j++)
+				massDiffDotProductHistogram[j][i] = 0;
+	}
 
 	for (i = 0; i < datasetAsize; i++) {
 		if (topN > -1)
@@ -564,7 +587,16 @@ int main(int argc, char *argv[]) {
 				for (k = 0; k < nBins; k++)
 					dotProd += A[i].bin[k] * B[j].bin[k];
 				if (fabs(dotProd) <= 1.00)
-					histogram[100 + (int) floor(dotProd * 99.999999999999)]++;
+					histogram[(int) (HISTOGRAM_BINS / 2)
+							+ (int) floor(dotProd * (HISTOGRAM_BINS / 2 - 1E-9))]++;
+				if (experimentalFeatures == 1)
+					massDiffDotProductHistogram[(int) (MASS_DIFF_HISTOGRAM_BINS
+							/ 2)
+							+ (int) floor(
+									(B[j].precursorMz - A[i].precursorMz)
+											* 99.99999999999999999)][(int) (HISTOGRAM_BINS
+							/ 2) /* constant scaling 1 bin = 0.01 m/z units */
+							+ (int) floor(dotProd * (HISTOGRAM_BINS / 2 - 1E-9))]++;
 				nComparisons++;
 				if (dotProd > maxDotProd) {
 					maxDotProd = dotProd;
@@ -604,8 +636,9 @@ int main(int argc, char *argv[]) {
 				for (k = 0; k < nBins; k++)
 					dotProd += B[i].bin[k] * A[j].bin[k];
 				if (fabs(dotProd) <= 1.00)
-					histogram[100 + (int) floor(dotProd * 99.999999999999)]++;
-				/* nComparisons++; */
+					histogram[(int) (HISTOGRAM_BINS / 2)
+							+ (int) floor(dotProd * (HISTOGRAM_BINS / 2 - 1E-9))]++;
+				nComparisons++;
 				if (dotProd > maxDotProd) {
 					maxDotProd = dotProd;
 				}
@@ -633,7 +666,7 @@ int main(int argc, char *argv[]) {
 	{
 		if (greaterThanCutoff > 0)
 			fprintf(output, "set_distance\t%1.10f\n",
-					(double) nComparisons / greaterThanCutoff);
+					(double) nComparisons / 2.0 / greaterThanCutoff);
 		if (greaterThanCutoff == 0)
 			fprintf(output, "set_distance\tINF\n");
 	}
@@ -675,15 +708,31 @@ int main(int argc, char *argv[]) {
 	fprintf(output, "m/z_bin_size\t%.4f\n", binSize);
 	fprintf(output, "n_m/z_bins\t%ld\n", nBins);
 	/* fprintf(output,"histogram (interval, midpoint, comparisons)\n"); */
-	for (i = 0; i < 200; i++)
-		fprintf(output, "histogram\t%1.3f\t%1.3f\t%1.3f\t%ld\n",
+	for (i = 0; i < HISTOGRAM_BINS; i++)
+		fprintf(output, "histogram\t%1.3f\t%1.3f\t%1.3f\t%ld\t%ld\n",
 				(double) (i - 100) / 100, (double) (i + 1 - 100) / 100,
-				(double) (i + 0.5 - 100) / 100, histogram[i]);
+				(double) (i + 0.5 - 100) / 100, histogram[i],
+				massDiffHistogram[i]);
 	fflush(output);
-
-	/* close files and free memory */
-
 	fclose(output);
+
+	if (experimentalFeatures == 1) {
+		if ((output = fopen(experimentalOutputFilename, "w")) == NULL) {
+			printf("error opening experimental output file %s for writing",
+					experimentalOutputFilename);
+			return -1;
+		}
+		for (i = 0; i < HISTOGRAM_BINS; i++) {
+			for (j = 0; j < MASS_DIFF_HISTOGRAM_BINS - 1; j++)
+				fprintf(output, "%ld\t", massDiffDotProductHistogram[j][i]);
+			fprintf(output, "%ld\n",
+					massDiffDotProductHistogram[MASS_DIFF_HISTOGRAM_BINS - 1][i]);
+		}
+		fflush(output);
+		fclose(output);
+	}
+
+	/* free memory */
 	printf("done\nfreeing memory...");
 	fflush(stdout);
 	free(A);
