@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
 
 	/* test for correct number of parameters */
 
-	if (argc < 3 || argc > 17) {
+	if (argc < 3) {
 		printf(
 				"usage: compareMS2 -A <first dataset filename> -B <second dataset filename> -R <first scan number>,<last scan number> [-c <score cutoff> -o <output filename> -m <minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>] (type compareMS2 --help for more information)\n");
 		return -1;
@@ -586,17 +586,18 @@ int main(int argc, char *argv[]) {
 				dotProd = 0;
 				for (k = 0; k < nBins; k++)
 					dotProd += A[i].bin[k] * B[j].bin[k];
-				if (fabs(dotProd) <= 1.00)
+				if (fabs(dotProd) <= 1.00) {
 					histogram[(int) (HISTOGRAM_BINS / 2)
 							+ (int) floor(dotProd * (HISTOGRAM_BINS / 2 - 1E-9))]++;
-				if (experimentalFeatures == 1)
-					massDiffDotProductHistogram[(int) (MASS_DIFF_HISTOGRAM_BINS
-							/ 2)
-							+ (int) floor(
-									(B[j].precursorMz - A[i].precursorMz)
-											* 99.99999999999999999)][(int) (HISTOGRAM_BINS
-							/ 2) /* constant scaling 1 bin = 0.01 m/z units */
-							+ (int) floor(dotProd * (HISTOGRAM_BINS / 2 - 1E-9))]++;
+					if (experimentalFeatures == 1)
+						massDiffDotProductHistogram[(int) (MASS_DIFF_HISTOGRAM_BINS
+								/ 2)
+								+ (int) floor(
+										(B[j].precursorMz - A[i].precursorMz)
+												* 99.99999999999999999)][(int) (HISTOGRAM_BINS
+								/ 2) /* constant scaling 1 bin = 0.01 m/z units */
+						+ (int) floor(dotProd * (HISTOGRAM_BINS / 2 - 1E-9))]++;
+				}
 				nComparisons++;
 				if (dotProd > maxDotProd) {
 					maxDotProd = dotProd;
