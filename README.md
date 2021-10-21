@@ -87,12 +87,12 @@ Figure 1. Phylogenetic tree based on sample primate [sera datasets](https://osf.
 
 The compareMS2 CLI has a small number of parameters, which are:
 
--1 *first dataset filename*  
--2 *second dataset filename*   
+-A *first dataset filename*  
+-B *second dataset filename*   
 -R *first scan number*, *last scan number*  
 -c *cutoff for spectral simiarity*  
 -o *output filename*  
--m *minimum base peak signal in MS/MS spectrum for comparison*, *minimum total ion signal in MS/MS spectrum for comparison*  
+-m *minimum base peak intensity*, *minimum total MS/MS intensity*  
 -a *alignment piecewise linear function filename*  
 -w *maximum scan number difference*  
 -p *maximum difference in precursor mass*  
