@@ -96,18 +96,17 @@ The compareMS2 CLI has a small number of parameters, which are:
 -a *alignment piecewise linear function filename*  
 -w *maximum scan number difference*  
 -p *maximum difference in precursor mass*  
--e *maximum precursor mass measurement error*
--s *intensity scaling before dot product*
--n *noise threshold for dot product*
--d *version of set distance metric*
--q *version of QC metric*
--N *include only N most intense spectra in comparison*
--b *bin size for dot product*
--I *minimum number of peaks for dot product*
--L *lower m/z for dot product*
--U *upper m/z for dot product*
--x *experimental features*
-
+-e *maximum precursor mass measurement error*  
+-s *intensity scaling before dot product*  
+-n *noise threshold for dot product*  
+-d *version of set distance metric*  
+-q *version of QC metric*  
+-N *include only N most intense spectra in comparison*  
+-b *bin size for dot product*  
+-I *minimum number of peaks for dot product*  
+-L *lower m/z for dot product*  
+-U *upper m/z for dot product*  
+-x *experimental features*  
 
 
 The compareMS2 GUI exposes some of these, and determine others automatically, e.g. the dataset filenames from a specified directory.
