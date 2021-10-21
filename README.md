@@ -78,10 +78,10 @@ For example, the resulting Windows installer can than be found (relative to the 
 
 ## 3. Using compareMS2
 
-compareMS2 can be used both from the command-line interface (CLI) and through the compareMS2 GUI. Every compareMS2 analysis consists of two phases: (1) pairwise comparison of all LC-MS/MS datasets and (2) calculating a distance matrix from all pairwise comparisons. The compareMS2 GUI provides real-time feedback by continuously updating the distance matrix, and drawing a UPGMA tree at the completion of each row in the (lower triangular) distance matrix. The distance metric is symmetric, i.e. the distance from dataset A to dataset B is identical to the distance from dataset B to dataset A. If the distance A - B has already been calculated, there is no need to calculate B - A. As every dataset is identical to itself, there is no point in calculating A - A or B - B, as these distances are always zero.
+compareMS2 can be used both from the command-line interface (CLI) and through the compareMS2 GUI. Every compareMS2 analysis consists of two phases: (1) pairwise comparison of all LC-MS/MS datasets and (2) calculating a distance matrix from all pairwise comparisons. The compareMS2 GUI provides real-time feedback by continuously updating the distance matrix, and drawing a UPGMA tree at the completion of each row in the (lower triangular) distance matrix. The default distance metric D is symmetric, i.e. the distance from dataset A to dataset B is identical to the distance from dataset B to dataset A. If the distance D(A, B) has already been calculated, there is no need to calculate D(B, A). As every dataset is identical to itself, there is no point in calculating D(A, A) or D(B, B), as these are always zero.
 
 ![compareMS2 on primate datasets](./pictures/primates_circular.png)  
-Figure 1. Phylogenetic tree based on sample primate [sera datasets](https://osf.io/sg796/) of 1,000 tandem mass spectra, as displayed during a compareMS2 run.
+Figure 1. Phylogenetic tree based on sample primate [sera datasets](https://osf.io/sg796/) of 1,000 tandem mass spectra, as displayed during a compareMS2 run. This is a good test dataset for compareMS2.
 
 ### 3.1 Configuring compareMS2  
 
@@ -90,13 +90,25 @@ The compareMS2 CLI has a small number of parameters, which are:
 -1 *first dataset filename*  
 -2 *second dataset filename*   
 -R *first scan number*, *last scan number*  
--c *score cutoff*  
+-c *cutoff for spectral simiarity*  
 -o *output filename*  
 -m *minimum base peak signal in MS/MS spectrum for comparison*, *minimum total ion signal in MS/MS spectrum for comparison*  
 -a *alignment piecewise linear function filename*  
 -w *maximum scan number difference*  
 -p *maximum difference in precursor mass*  
--e *maximum precursor mass measurement error*  
+-e *maximum precursor mass measurement error*
+-s *intensity scaling before dot product*
+-n *noise threshold for dot product*
+-d *version of set distance metric*
+-q *version of QC metric*
+-N *include only N most intense spectra in comparison*
+-b *bin size for dot product*
+-I *minimum number of peaks for dot product*
+-L *lower m/z for dot product*
+-U *upper m/z for dot product*
+-x *experimental features*
+
+
 
 The compareMS2 GUI exposes some of these, and determine others automatically, e.g. the dataset filenames from a specified directory.
 
