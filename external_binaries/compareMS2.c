@@ -740,7 +740,6 @@ int main(int argc, char *argv[]) {
 	fprintf(output, "m/z_range\t%.4f\t%.4f\n", minMz, maxMz);
 	fprintf(output, "m/z_bin_size\t%.4f\n", binSize);
 	fprintf(output, "n_m/z_bins\t%ld\n", nBins);
-	fprintf(output, "n_m/z_bins\t%ld\n", nBins);
 	/* fprintf(output,"histogram (interval, midpoint, comparisons)\n"); */
 	for (i = 0; i < HISTOGRAM_BINS; i++)
 		fprintf(output, "histogram\t%1.3f\t%1.3f\t%1.3f\t%ld\t%ld\n",
