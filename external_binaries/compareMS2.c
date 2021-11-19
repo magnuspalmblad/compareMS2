@@ -726,7 +726,7 @@ int main(int argc, char *argv[]) {
 	}
 	fprintf(output, "set_metric\t%i\n", metric);
 	fprintf(output,
-			"scan_range\t%ld\t%ld\nmax_scan_diff\t%.5f\nmax_m/z_diff\t%.5f\nscaling_power\t%.5f\nnoise_threshold\t%.5f\nmin_basepeak_intensity=%.2f\nmin_total_ion_current=%.2f\n",
+			"scan_range\t%ld\t%ld\nmax_scan_diff\t%.5f\nmax_m/z_diff\t%.5f\nscaling_power\t%.5f\nnoise_threshold\t%.5f\nmin_basepeak_intensity\t%.2f\nmin_total_ion_current\t%.2f\n",
 			startScan, endScan, maxScanNumberDifference, maxPrecursorDifference,
 			scaling, noise, minBasepeakIntensity, minTotalIonCurrent);
 	if (qc == 0)
