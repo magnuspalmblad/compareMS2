@@ -36,7 +36,8 @@
 
 #define MAX_LEN 8192
 #define HISTOGRAM_BINS 200
-#define	DEFAULT_MIN_BASEPEAK_INTENSITY 10000
+#define	DEFAULT_MIN_BASEPEAK_INTENSITY 0
+#define	DEFAULT_MIN_TOTAL_ION_CURRENT 0
 #define	DEFAULT_MAX_SCAN_NUMBER_DIFFERENCE  1500
 #define	DEFAULT_MAX_PRECURSOR_DIFFERENCE  2.05
 #define	DEFAULT_START_SCAN  1
@@ -157,6 +158,7 @@ int main(int argc, char *argv[]) {
 
 	strcpy(outputFilename, "output.txt");
 	minBasepeakIntensity = DEFAULT_MIN_BASEPEAK_INTENSITY;
+	minTotalIonCurrent = DEFAULT_MIN_TOTAL_ION_CURRENT;
 	maxScanNumberDifference = DEFAULT_MAX_PRECURSOR_DIFFERENCE;
 	maxPrecursorDifference = 2.05;
 	startScan = DEFAULT_START_SCAN;
