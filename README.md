@@ -30,7 +30,7 @@ Though compareMS2 is not limited to tandem mass spectra of peptides, it has seen
 | :---                                | :--- | :---                                             | :---                                              |
 |                                     |      | +                                                | -                                                 |
 | **prior/other tandem mass spectra** | +    | spectral libraries (BiblioSpec, SpectraST, ...)  | direct comparison (**compareMS2**, DISMS2, ...)  |
-|                                     | -    | database search (Mascot, Comet, ...)             | *de novo* sequencing (PepNovo, Lutefisk, ...)     |
+|                                     | -    | database search ([Mascot](https://doi.org/10.1002/(SICI)1522-2683(19991201)20:18<3551::AID-ELPS3551>3.0.CO;2-2), Comet, ...)             | *de novo* sequencing (PepNovo, Lutefisk, ...)     |
 
 
 ### 1.3 What can compareMS2 be used for?
