@@ -89,12 +89,14 @@ The compareMS2 CLI has a small number of parameters, which are:
 
 -A *first dataset filename*  
 -B *second dataset filename*   
--R *first scan number*, *last scan number*  
+-W *first scan number*, *last scan number*  
+-R *first retention time*, *last retention time*  
 -c *cutoff for spectral simiarity*  
 -o *output filename*  
 -m *minimum base peak intensity*, *minimum total MS/MS intensity*  
 -a *alignment piecewise linear function filename*  
 -w *maximum scan number difference*  
+-r *maximum retention time difference*  
 -p *maximum difference in precursor mass*  
 -e *maximum precursor mass measurement error*  
 -s *intensity scaling before dot product*  
