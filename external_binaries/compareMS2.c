@@ -433,15 +433,25 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		A[i].scan = startScan; /* default if no scan information is available */
-		if (strspn("SCANS", p) > 4) {
+		if (strspn("SCANS", p) > 4) { /* MGFs with SCANS attributes */
 			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
 			continue;
 		}
-		if (strncmp("###MSMS:", p, 8) == 0) {
+		if (strncmp("###MSMS:", p, 8) == 0) { /* Bruker-style MGFs */
 			p = strtok('\0', " \t");
 			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+			continue;
+		}
+		if (strspn("TITLE", p) > 4) { /* msconvert-style MGFs with NativeID and scan= */
+			while(p != NULL) {
+				if (strstr(p, "scan=") != NULL) {
+					A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
+					// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+				}
+				p = strtok('\0', " \t");
+			}
 			continue;
 		}
 		if (strcmp("END", p) == 0) {
@@ -488,15 +498,25 @@ int main(int argc, char *argv[]) {
 			}
 		}
 		B[i].scan = startScan; /* default if no scan information is available */
-		if (strspn("SCANS", p) > 4) {
+		if (strspn("SCANS", p) > 4) { /* MGFs with SCANS attributes */
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
-			// printf("B[%ld].scan = %ld\n", i, B[i].scan); fflush(stdout);
+			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
 			continue;
 		}
-		if (strncmp("###MSMS:", p, 8) == 0) {
+		if (strncmp("###MSMS:", p, 8) == 0) { /* Bruker-style MGFs */
 			p = strtok('\0', " \t");
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
-			// printf("B[%ld].scan = %ld\n", i, B[i].scan); fflush(stdout);
+			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+			continue;
+		}
+		if (strspn("TITLE", p) > 4) { /* msconvert-style MGFs with NativeID and scan= */
+			while(p != NULL) {
+				if (strstr(p, "scan=") != NULL) {
+					B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
+					// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+				}
+				p = strtok('\0', " \t");
+			}
 			continue;
 		}
 		if (strcmp("END", p) == 0) {
