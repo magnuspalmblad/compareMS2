@@ -487,6 +487,7 @@ int main(int argc, char *argv[]) {
 				j++;
 			}
 		}
+		B[i].scan = 0; /* default to 0 if no scan information is available */
 		if (strspn("SCANS", p) > 4) {
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("B[%ld].scan = %ld\n", i, B[i].scan); fflush(stdout);
