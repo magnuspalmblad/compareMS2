@@ -39,9 +39,12 @@
 #define	DEFAULT_MIN_BASEPEAK_INTENSITY 0
 #define	DEFAULT_MIN_TOTAL_ION_CURRENT 0
 #define	DEFAULT_MAX_SCAN_NUMBER_DIFFERENCE 10000
+#define	DEFAULT_MAX_RT_DIFFERENCE 60
 #define	DEFAULT_MAX_PRECURSOR_DIFFERENCE 2.05
 #define	DEFAULT_START_SCAN 1
 #define	DEFAULT_END_SCAN 1000000
+#define	DEFAULT_START_RT 0
+#define	DEFAULT_END_RT 100000
 #define	DEFAULT_CUTOFF 0.8
 #define	DEFAULT_SCALING 0.5
 #define	DEFAULT_NOISE 0
@@ -57,6 +60,7 @@
 #define DEFAULT_EXPERIMENTAL_FEATURES 0
 #define MASS_DIFF_HISTOGRAM_BINS 320
 #define DEFAULT_SCAN_NUMBERS_COULD_BE_READ 0
+#define DEFAULT_RTS_COULD_BE_READ 0
 
 /* atol0 acts the same as atol, but handles a null pointer without crashing */
 static int atol0(const char *p) {
@@ -110,20 +114,22 @@ int main(int argc, char *argv[]) {
 	char datasetAFilename[MAX_LEN], datasetBFilename[MAX_LEN],
 			outputFilename[MAX_LEN], experimentalOutputFilename[MAX_LEN],
 			temp[MAX_LEN], line[MAX_LEN], *p, metric, qc, experimentalFeatures,
-			datasetAScanNumbersCouldBeRead, datasetBScanNumbersCouldBeRead;
+			datasetAScanNumbersCouldBeRead, datasetBScanNumbersCouldBeRead,
+			datasetARTsCouldBeRead, datasetBRTsCouldBeRead;
 	long i, j, k, datasetASize, datasetBSize, startScan, endScan, nComparisons,
 			minPeaks, maxPeaks, nBins, nPeaks, topN, histogram[HISTOGRAM_BINS],
 			massDiffHistogram[HISTOGRAM_BINS], **massDiffDotProductHistogram,
 			greaterThanCutoff, sAB, sBA, datasetAActualCompared,
 			datasetBActualCompared;
 	double minBasepeakIntensity, minTotalIonCurrent, maxScanNumberDifference,
-			maxPrecursorDifference, cutoff, scaling, noise, minMz, maxMz,
-			binSize, *datasetAIntensities, *datasetBIntensities, datasetACutoff,
-			datasetBCutoff, dotProd, maxDotProd, dotProdSum, squareSum,
-			rootSquareSum;
+			maxRTDifference, startRT, endRT, maxPrecursorDifference, cutoff,
+			scaling, noise, minMz, maxMz, binSize, *datasetAIntensities,
+			*datasetBIntensities, datasetACutoff, datasetBCutoff, dotProd,
+			maxDotProd, dotProdSum, squareSum, rootSquareSum;
 
 	typedef struct {
 		long scan; /* scan number */
+		double rt; /* retention time in seconds */
 		double *mz; /* measured m/z */
 		double *intensity; /* measured intensities */
 		char charge; /* deconvoluted charge (in MGF file) */
@@ -144,7 +150,7 @@ int main(int argc, char *argv[]) {
 					|| (strcmp(argv[1], "-h") == 0))) /* want help? */
 			{
 		printf(
-				"compareMS2 - (c) Magnus Palmblad 2010-2021\n\ncompareMS2 is developed to compare, globally, all MS/MS spectra between two datasets in MGF acquired under similar conditions, or aligned so that they are comparable. This may be useful for molecular phylogenetics based on shared peptide sequences quantified by the share of highly similar tandem mass spectra. The similarity between a pair of tandem mass spectra is calculated essentially as in SpectraST [see Lam et al. Proteomics 2007, 7, 655-667 (2007)].\n\nusage: compareMS2 -A <first dataset filename> -B <second dataset filename> [-R <first scan number>,<last scan number> -c <score cutoff, default=0.8> -o <output filename> -m<minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error in MS/MS> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>]\n");
+				"compareMS2 - (c) Magnus Palmblad 2010-2021\n\ncompareMS2 is developed to compare, globally, all MS/MS spectra between two datasets in MGF acquired under similar conditions, or aligned so that they are comparable. This may be useful for molecular phylogenetics based on shared peptide sequences quantified by the share of highly similar tandem mass spectra. The similarity between a pair of tandem mass spectra is calculated essentially as in SpectraST [see Lam et al. Proteomics 2007, 7, 655-667 (2007)].\n\nusage: compareMS2 -A <first dataset filename> -B <second dataset filename> [-W <first scan number>,<last scan number> -R <first retention time>,<last retention time> -c <score cutoff, default=0.8> -o <output filename> -m<minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -w <maximum scan number difference> -r <maximum retention time difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error in MS/MS> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>]\n");
 		return 0;
 	}
 
@@ -152,7 +158,7 @@ int main(int argc, char *argv[]) {
 
 	if (argc < 3) {
 		printf(
-				"usage: compareMS2 -A <first dataset filename> -B <second dataset filename> -R <first scan number>,<last scan number> [-c <score cutoff> -o <output filename> -m <minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -a <alignment piecewise linear function filename> -w <maximum scan number difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>] (type compareMS2 --help for more information)\n");
+				"usage: compareMS2 -A <first dataset filename> -B <second dataset filename> [-W <first scan number>,<last scan number> -R <first retention time>,<last retention time> -c <score cutoff> -o <output filename> -m <minimum base peak signal in MS/MS spectrum for comparison>,<minimum total ion signal in MS/MS spectrum for comparison> -w <maximum scan number difference> -r <maximum retention time difference> -p <maximum difference in precursor mass> -e <maximum mass measurement error> -s <scaling power> -n <noise threshold> -d <distance metric (0, 1 or 2)> -q <QC measure (0)>] (type compareMS2 --help for more information)\n");
 		return -1;
 	}
 
@@ -162,9 +168,12 @@ int main(int argc, char *argv[]) {
 	minBasepeakIntensity = DEFAULT_MIN_BASEPEAK_INTENSITY;
 	minTotalIonCurrent = DEFAULT_MIN_TOTAL_ION_CURRENT;
 	maxScanNumberDifference = DEFAULT_MAX_SCAN_NUMBER_DIFFERENCE;
+	maxRTDifference = DEFAULT_MAX_RT_DIFFERENCE;
 	maxPrecursorDifference = DEFAULT_MAX_PRECURSOR_DIFFERENCE;
 	startScan = DEFAULT_START_SCAN;
 	endScan = DEFAULT_END_SCAN;
+	startRT = DEFAULT_START_RT;
+	endRT = DEFAULT_END_RT;
 	cutoff = DEFAULT_CUTOFF;
 	scaling = DEFAULT_SCALING;
 	noise = DEFAULT_NOISE;
@@ -180,6 +189,8 @@ int main(int argc, char *argv[]) {
 	experimentalFeatures = DEFAULT_EXPERIMENTAL_FEATURES;
 	datasetAScanNumbersCouldBeRead = DEFAULT_SCAN_NUMBERS_COULD_BE_READ;
 	datasetBScanNumbersCouldBeRead = DEFAULT_SCAN_NUMBERS_COULD_BE_READ;
+	datasetARTsCouldBeRead = DEFAULT_RTS_COULD_BE_READ;
+	datasetBRTsCouldBeRead = DEFAULT_RTS_COULD_BE_READ;
 	strcpy(experimentalOutputFilename, "experimental_output.txt");
 
 	/* read and replace parameter values */
@@ -193,7 +204,7 @@ int main(int argc, char *argv[]) {
 			strcpy(datasetBFilename,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
 							strlen(argv[i]) > 2 ? 2 : 0]);
-		if ((argv[i][0] == '-') && (argv[i][1] == 'R')) { /* range of spectra (scans) */
+		if ((argv[i][0] == '-') && (argv[i][1] == 'W')) { /* range of spectra (in scans) */
 			strcpy(temp,
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
 							strlen(argv[i]) > 2 ? 2 : 0]);
@@ -201,6 +212,15 @@ int main(int argc, char *argv[]) {
 			startScan = atol0(p);
 			p = strtok('\0', ",");
 			endScan = atol0(p);
+		}
+		if ((argv[i][0] == '-') && (argv[i][1] == 'R')) { /* range of spectra (in RT) */
+			strcpy(temp,
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+			p = strtok(temp, ",");
+			startRT = atof0(p);
+			p = strtok('\0', ",");
+			endRT = atof0(p);
 		}
 		if ((argv[i][0] == '-') && (argv[i][1] == 'o')) /* output filename */
 			strcpy(outputFilename,
@@ -220,7 +240,11 @@ int main(int argc, char *argv[]) {
 			minTotalIonCurrent = atof(p);
 		}
 		if ((argv[i][0] == '-') && (argv[i][1] == 'w')) /* maximum scan number difference */
-			maxScanNumberDifference = atof(
+			maxScanNumberDifference = atof0(
+					&argv[strlen(argv[i]) > 2 ? i : i + 1][
+							strlen(argv[i]) > 2 ? 2 : 0]);
+		if ((argv[i][0] == '-') && (argv[i][1] == 'r')) /* maximum RT difference */
+			maxRTDifference = atof0(
 					&argv[strlen(argv[i]) > 2 ? i : i + 1][
 							strlen(argv[i]) > 2 ? 2 : 0]);
 		if ((argv[i][0] == '-') && (argv[i][1] == 'c')) /* cutoff for spectral similarity */
@@ -440,27 +464,34 @@ int main(int argc, char *argv[]) {
 		if (strspn("SCANS", p) > 4) { /* MGFs with SCANS attributes */
 			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
-			datasetAScanNumbersCouldBeRead=1;
+			datasetAScanNumbersCouldBeRead = 1;
 			continue;
 		}
 		if (strncmp("###MSMS:", p, 8) == 0) { /* Bruker-style MGFs */
 			p = strtok('\0', " \t");
 			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
-			datasetAScanNumbersCouldBeRead=1;
+			datasetAScanNumbersCouldBeRead = 1;
 			continue;
 		}
 		if (strspn("TITLE", p) > 4) { /* msconvert-style MGFs with NativeID and scan= */
-			while(p != NULL) {
+			while (p != NULL) {
 				if (strstr(p, "scan=") != NULL) {
 					A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 					// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
-					datasetAScanNumbersCouldBeRead=1;
+					datasetAScanNumbersCouldBeRead = 1;
 				}
 				p = strtok('\0', " \t");
 			}
 			continue;
 		}
+		A[i].rt = startRT; /* default if no scan information is available */
+			if (strspn("RTINSECONDS", p) > 10) { /* MGFs with RTINSECONDS attributes */
+				A[i].rt = (double) atof0(strpbrk(p, "0123456789"));
+				// printf("A[%ld].rt = %ld\n", i, A[i].scan); fflush(stdout);
+				datasetARTsCouldBeRead = 1;
+				continue;
+			}
 		if (strcmp("END", p) == 0) {
 			A[i].nPeaks = j;
 			A[i].basepeakIntensity = 0;
@@ -507,28 +538,35 @@ int main(int argc, char *argv[]) {
 		B[i].scan = startScan; /* default if no scan information is available */
 		if (strspn("SCANS", p) > 4) { /* MGFs with SCANS attributes */
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
-			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
-			datasetBScanNumbersCouldBeRead=1;
+			// printf("B[%ld].scan = %ld\n", i, B[i].scan); fflush(stdout);
+			datasetBScanNumbersCouldBeRead = 1;
 			continue;
 		}
 		if (strncmp("###MSMS:", p, 8) == 0) { /* Bruker-style MGFs */
 			p = strtok('\0', " \t");
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
-			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
-			datasetBScanNumbersCouldBeRead=1;
+			// printf("B[%ld].scan = %ld\n", i, B[i].scan); fflush(stdout);
+			datasetBScanNumbersCouldBeRead = 1;
 			continue;
 		}
 		if (strspn("TITLE", p) > 4) { /* msconvert-style MGFs with NativeID and scan= */
-			while(p != NULL) {
+			while (p != NULL) {
 				if (strstr(p, "scan=") != NULL) {
 					B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
-					// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
-					datasetBScanNumbersCouldBeRead=1;
+					// printf("B[%ld].scan = %ld\n", i, B[i].scan); fflush(stdout);
+					datasetBScanNumbersCouldBeRead = 1;
 				}
 				p = strtok('\0', " \t");
 			}
 			continue;
 		}
+		B[i].rt = startRT; /* default if no scan information is available */
+			if (strspn("RTINSECONDS", p) > 10) { /* MGFs with RTINSECONDS attributes */
+				B[i].rt = (double) atof0(strpbrk(p, "0123456789"));
+				// printf("B[%ld].rt = %ld\n", i, B[i].scan); fflush(stdout);
+				datasetBRTsCouldBeRead = 1;
+				continue;
+			}
 		if (strcmp("END", p) == 0) {
 			B[i].nPeaks = j;
 			B[i].basepeakIntensity = 0;
@@ -543,16 +581,37 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	printf("done\n");
-	if(datasetAScanNumbersCouldBeRead==0) {
-		printf("warning: scan numbers could not be read from dataset A (%s)\n", datasetAFilename);
+
+	if (datasetAScanNumbersCouldBeRead == 0) {
+		printf("warning: scan numbers could not be read from dataset A (%s)\n",
+				datasetAFilename);
 	}
-	if(datasetBScanNumbersCouldBeRead==0) {
-		printf("warning: scan numbers could not be read from dataset B (%s)\n", datasetBFilename);
+	if (datasetBScanNumbersCouldBeRead == 0) {
+		printf("warning: scan numbers could not be read from dataset B (%s)\n",
+				datasetBFilename);
 	}
-	if((datasetAScanNumbersCouldBeRead==0) || (datasetBScanNumbersCouldBeRead==0)) {
-		printf("scan parameters will be ignored and all scans compared\n");
+	if ((datasetAScanNumbersCouldBeRead == 0)
+			|| (datasetBScanNumbersCouldBeRead == 0)) {
+		maxScanNumberDifference = DEFAULT_MAX_SCAN_NUMBER_DIFFERENCE;
+		printf("scan filters will be ignored\n");
 	}
 	fflush(stdout);
+
+	if (datasetARTsCouldBeRead == 0) {
+		printf("warning: retention times could not be read from dataset A (%s)\n",
+				datasetAFilename);
+	}
+	if (datasetBRTsCouldBeRead == 0) {
+		printf("warning: retention times could not be read from dataset B (%s)\n",
+				datasetBFilename);
+	}
+	if ((datasetARTsCouldBeRead == 0)
+			|| (datasetBRTsCouldBeRead == 0)) {
+		maxRTDifference = DEFAULT_MAX_RT_DIFFERENCE;
+		printf("retention time filters will be ignored\n");
+	}
+	fflush(stdout);
+
 	printf("scaling, normalizing and binning %ld MS2 spectra from %s..",
 			datasetASize, datasetAFilename);
 	fflush(stdout);
@@ -659,6 +718,10 @@ int main(int argc, char *argv[]) {
 				continue;
 			if ((B[j].scan - A[i].scan) > maxScanNumberDifference)
 				break;
+			if ((A[i].rt - B[j].rt) > maxRTDifference)
+				continue;
+			if ((B[j].rt - A[i].rt) > maxRTDifference)
+				break;
 			if (fabs(B[j].precursorMz - A[i].precursorMz)
 					< maxPrecursorDifference) {
 				dotProd = 0;
@@ -717,10 +780,12 @@ int main(int argc, char *argv[]) {
 				continue;
 			if ((B[i].scan - A[j].scan) > maxScanNumberDifference)
 				continue;
-			//printf("2: %ld %ld\n",A[j].scan, B[i].scan );
 			if ((A[j].scan - B[i].scan) > maxScanNumberDifference)
 				break;
-
+			if ((B[i].rt - A[j].rt) > maxRTDifference)
+				continue;
+			if ((A[j].rt - B[i].rt) > maxRTDifference)
+				break;
 			if (fabs(A[j].precursorMz - B[i].precursorMz)
 					< maxPrecursorDifference) {
 				//printf("2: A[%i] vs B[%i]\n", j, i);
