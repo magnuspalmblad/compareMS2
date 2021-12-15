@@ -56,6 +56,7 @@
 #define	DEFAULT_TOP_N -1
 #define DEFAULT_EXPERIMENTAL_FEATURES 0
 #define MASS_DIFF_HISTOGRAM_BINS 320
+#define DEFAULT_SCAN_NUMBERS_COULD_BE_READ 0
 
 /* atol0 acts the same as atol, but handles a null pointer without crashing */
 static int atol0(const char *p) {
@@ -108,7 +109,8 @@ int main(int argc, char *argv[]) {
 	FILE *datasetA, *datasetB, *output;
 	char datasetAFilename[MAX_LEN], datasetBFilename[MAX_LEN],
 			outputFilename[MAX_LEN], experimentalOutputFilename[MAX_LEN],
-			temp[MAX_LEN], line[MAX_LEN], *p, metric, qc, experimentalFeatures;
+			temp[MAX_LEN], line[MAX_LEN], *p, metric, qc, experimentalFeatures,
+			datasetAScanNumbersCouldBeRead, datasetBScanNumbersCouldBeRead;
 	long i, j, k, datasetASize, datasetBSize, startScan, endScan, nComparisons,
 			minPeaks, maxPeaks, nBins, nPeaks, topN, histogram[HISTOGRAM_BINS],
 			massDiffHistogram[HISTOGRAM_BINS], **massDiffDotProductHistogram,
@@ -176,6 +178,8 @@ int main(int argc, char *argv[]) {
 	nBins = DEFAULT_N_BINS;
 	topN = DEFAULT_TOP_N;
 	experimentalFeatures = DEFAULT_EXPERIMENTAL_FEATURES;
+	datasetAScanNumbersCouldBeRead = DEFAULT_SCAN_NUMBERS_COULD_BE_READ;
+	datasetBScanNumbersCouldBeRead = DEFAULT_SCAN_NUMBERS_COULD_BE_READ;
 	strcpy(experimentalOutputFilename, "experimental_output.txt");
 
 	/* read and replace parameter values */
@@ -436,12 +440,14 @@ int main(int argc, char *argv[]) {
 		if (strspn("SCANS", p) > 4) { /* MGFs with SCANS attributes */
 			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+			datasetAScanNumbersCouldBeRead=1;
 			continue;
 		}
 		if (strncmp("###MSMS:", p, 8) == 0) { /* Bruker-style MGFs */
 			p = strtok('\0', " \t");
 			A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+			datasetAScanNumbersCouldBeRead=1;
 			continue;
 		}
 		if (strspn("TITLE", p) > 4) { /* msconvert-style MGFs with NativeID and scan= */
@@ -449,6 +455,7 @@ int main(int argc, char *argv[]) {
 				if (strstr(p, "scan=") != NULL) {
 					A[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 					// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+					datasetAScanNumbersCouldBeRead=1;
 				}
 				p = strtok('\0', " \t");
 			}
@@ -501,12 +508,14 @@ int main(int argc, char *argv[]) {
 		if (strspn("SCANS", p) > 4) { /* MGFs with SCANS attributes */
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+			datasetBScanNumbersCouldBeRead=1;
 			continue;
 		}
 		if (strncmp("###MSMS:", p, 8) == 0) { /* Bruker-style MGFs */
 			p = strtok('\0', " \t");
 			B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 			// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+			datasetBScanNumbersCouldBeRead=1;
 			continue;
 		}
 		if (strspn("TITLE", p) > 4) { /* msconvert-style MGFs with NativeID and scan= */
@@ -514,6 +523,7 @@ int main(int argc, char *argv[]) {
 				if (strstr(p, "scan=") != NULL) {
 					B[i].scan = (long) atol0(strpbrk(p, "0123456789"));
 					// printf("A[%ld].scan = %ld\n", i, A[i].scan); fflush(stdout);
+					datasetBScanNumbersCouldBeRead=1;
 				}
 				p = strtok('\0', " \t");
 			}
@@ -533,8 +543,16 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	printf("done\n");
+	if(datasetAScanNumbersCouldBeRead==0) {
+		printf("warning: scan numbers could not be read from dataset A (%s)\n", datasetAFilename);
+	}
+	if(datasetBScanNumbersCouldBeRead==0) {
+		printf("warning: scan numbers could not be read from dataset B (%s)\n", datasetBFilename);
+	}
+	if((datasetAScanNumbersCouldBeRead==0) || (datasetBScanNumbersCouldBeRead==0)) {
+		printf("scan parameters will be ignored and all scans compared\n");
+	}
 	fflush(stdout);
-
 	printf("scaling, normalizing and binning %ld MS2 spectra from %s..",
 			datasetASize, datasetAFilename);
 	fflush(stdout);
