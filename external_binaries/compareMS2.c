@@ -888,7 +888,7 @@ int main(int argc, char *argv[]) {
 		}
 		fflush(output);
 		fclose(output);
-	
+	}
 
 	/* free memory */
 	printf("done\nfreeing memory...");
