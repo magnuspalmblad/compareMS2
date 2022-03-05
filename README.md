@@ -134,6 +134,9 @@ In addition, compareMS2 collects metadata on each dataset (currently only the nu
 
 compareMS2 and related applications have been described or mentioned in a number of papers:
 
+Shotgun proteomics approaches for authentication, biological analyses, and allergen detection in feed and food-grade insect species
+Varunjikar MS, Belghit I, Gjerde J, Palmblad M, Oveland E, Rasinger JD, *Food Control* **131**, 2022, [doi.org/10.1016/j.foodcont.2022.108888](https://doi.org/10.1016/j.foodcont.2022.108888)
+
 Comparing novel shotgun DNA sequencing and state-of-the-art proteomics approaches for authentication of fish species in mixed samples, Varunjikar MS, Moreno-Ibarguen C, Andrade-Martinez JS, Tung HS, Belghit I, Palmblad M, Olsvik PA, Reyes A, Rasinger JD and Lie KK, *Food Control* **131**, 108417, 2022, [doi.org/10.1016/j.foodcont.2021.108417](https://doi.org/10.1016/j.foodcont.2021.108417)
 
 Rewinding the molecular clock: looking at pioneering molecular phylogenetics experiments in the light of proteomics, Neely B and Palmblad M, *J. Proteome Res.* 20, 10, 4640-4645, 2021, [doi.org/10.1021/acs.jproteome.1c00528](https://doi.org/10.1021/acs.jproteome.1c00528)
