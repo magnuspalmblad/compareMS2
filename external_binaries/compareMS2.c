@@ -752,7 +752,7 @@ int main(int argc, char *argv[]) {
 								/ 2)
 								+ (int) floor(
 										(B[j].precursorMz - A[i].precursorMz)
-												* 999.99999999999999999)][(int) (DOTPROD_HISTOGRAM_BINS
+												* 999.999999999999)][(int) (DOTPROD_HISTOGRAM_BINS
 								/ 2) /* constant scaling 1 bin = 0.01 m/z units */
 						+ (int) floor(dotProd * (DOTPROD_HISTOGRAM_BINS / 2 - 1E-9))]++;
 				}
