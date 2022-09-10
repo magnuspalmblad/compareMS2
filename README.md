@@ -14,6 +14,7 @@ compareMS2 calculates the global similarity between tandem mass spectrometry dat
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[3.3 Running compareMS2](#33-Running-compareMS2)  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[3.4 Molecular phylogenetics](#34-Molecular-phylogenetics)  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[3.5 Data quality control](#35-Data-quality-control)  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[3.6 Experimental features](#36-Experimental-features)  
 [4. Further reading](#4-Further-reading)  
 
 
@@ -42,10 +43,14 @@ However, not only the amino acid sequences of the peptides affect the distance m
 
 ## 2. Installing compareMS2
 
+On Windows, the easiest way to install compareMS2 is through the [installer](https://github.com/524D/compareMS2/releases) (under "assets").
+
+Alternatively, and for other platforms, follow the instructions below.
+
 First install nodejs:
 
-* On Linux, run `apt install nodejs`
-* On Windows, download from: <https://nodejs.org/en/download/>
+* On Debian/Ubuntu Linux, run `apt install nodejs`
+* On Windows and macOS, download from: <https://nodejs.org/en/download/>
 
 Then run the following on the command line:
 
@@ -56,12 +61,21 @@ cd compareMS2
 npm install
 ```
 
+Ignore npm vulnerability warnings (**don't** run ```npm audit fix```). Since compareMS is not a web app, they are of limited relevance,
+and they can't easily be fixed.
+
 ### 2.1 Running compareMS2 in development mode
 
 To run compareMS2 in "development mode", simply issue:
 
 ```text
 electron-forge start
+```
+
+For debug mode (enabling Chrome development tools):
+
+```text
+CPM_MS2_DEBUG="x" electron-forge start
 ```
 
 ### 2.2 Building compareMS2
@@ -128,9 +142,20 @@ We recommend [MEGA](https://www.megasoftware.net/) creating phylogenetic trees f
 
 compareMS2 provides a very quick overview of large number of datasets to see if they cluster as expected or if there are outliers. Data of lower quality can thus be detected *before* running them through a data analysis pipeline and statistical analysis. It is not absolutely necessary to include all spectra in the analysis - major discrepancies should be detectable with ~1,000 spectra, if selected systematically. Similarly, compareMS2 can be used to determine the relative importance of factors in sample preparation and analysis, as shown in a [2016 paper](https://doi.org/10.1002/rcm.7494). 
 
-In addition, compareMS2 collects metadata on each dataset (currently only the number of tandem mass spectra) for overlay on the hierarcical clustering or phylogenetic tree as a color.
+In addition, compareMS2 collects metadata on each dataset (by default the number of tandem mass spectra) and visualizes this on top of the hierarcical clustering or phylogenetic tree.
 
-## 4. Further reading
+### 3.6 Experimental features
+
+Starting in version 2.0, we have begun to include experimental features in compareMS2. These are only available on the command line, but allow extraction of additional information from the comparisons, such as the distribution of similarity between tandem mass spectra as function of precursor mass measurement error, allowing identification of isotope errors and charge state distributions *before* any database search:
+
+![Experimental feature](./pictures/experimental_features.png)  
+Figure 2. Similarty (spectral angle from 0 to 1) of tandem mass spectra plotted against precursor *m*/*z* difference, revaling isotope errors up to at least 2 (corresponding to bands at *m*/*z* difference 2/3 and 2/5) and charge states up to 6 (corresponding to the band at *m*/*z* difference 1/6).
+
+## 4. Acknowledgements
+
+The developers wish to thank Dr. Michael Dondrup at the University of Bergen for providing changes and additions to make compareMS2 work under macOS. All users and beta testers are also acknowledged for their valuable feedback that helped to improve compareMS2.
+
+## 5. Further reading
 
 compareMS2 and related applications have been described or mentioned in a number of papers:
 
