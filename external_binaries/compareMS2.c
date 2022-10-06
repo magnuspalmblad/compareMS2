@@ -741,10 +741,10 @@ int main(int argc, char *argv[]) {
 				dotProd = 0;
 				for (k = 0; k < nBins; k++)
 					dotProd += A[i].bin[k] * B[j].bin[k];
-
-				if(spectrum_metric == 1) dotProd = 1-2*(acos(dotProd)/3.141592); /* use spectral angle (SA) instead */
-
 				if (fabs(dotProd) <= 1.00) {
+    				if(spectrum_metric == 1) dotProd = 1-2*(acos(dotProd)/3.141593); /* use spectral angle (SA) instead */
+                    /* Round up pi to ensure the abs result is <= 1.0 */
+
 					dotprodHistogram[(int) (DOTPROD_HISTOGRAM_BINS / 2)
 							+ (int) floor(dotProd * (DOTPROD_HISTOGRAM_BINS / 2 - 1E-9))]++;
 					if (experimentalFeatures == 1)
@@ -810,10 +810,10 @@ int main(int argc, char *argv[]) {
 				dotProd = 0;
 				for (k = 0; k < nBins; k++)
 					dotProd += B[i].bin[k] * A[j].bin[k];
-
-				if(spectrum_metric == 1) dotProd = 1-2*(acos(dotProd)/3.141592); /* use spectral angle (SA) instead */
-
 				if (fabs(dotProd) <= 1.00)
+    				if(spectrum_metric == 1) dotProd = 1-2*(acos(dotProd)/3.141593); /* use spectral angle (SA) instead */
+                    /* Round up pi to ensure the abs result is <= 1.0 */
+
 					dotprodHistogram[(int) (DOTPROD_HISTOGRAM_BINS / 2)
 							+ (int) floor(dotProd * (DOTPROD_HISTOGRAM_BINS / 2 - 1E-9))]++;
 				nComparisons++;
